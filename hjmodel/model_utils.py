@@ -167,16 +167,14 @@ def get_dn(dedn: float, dadn: float, e: float, a: float, C: float, n_cum: float)
 
 def tidal_effect(e: float, a: float, m1: float, m2: float, time_in_Myr: float) -> (float, float):
     # let n be normalised time (i.e. n(0) = 0, n(time_in_Myr) = 1)
-    dedn = de_tid_dt(e=e, a=a, m1=m1, m2=m2) * time_in_Myr
-    dadn = da_tid_dt(e=e, a=a, m1=m1, m2=m2) * time_in_Myr
     n_cum = 0
     while n_cum < 1 and e > 1E-3:
+        dedn = de_tid_dt(e=e, a=a, m1=m1, m2=m2) * time_in_Myr
+        dadn = da_tid_dt(e=e, a=a, m1=m1, m2=m2) * time_in_Myr
         dn = get_dn(dedn, dadn, a, e, 0.01, n_cum)
         n_cum += dn
         e += dedn * dn
         a += dadn * dn
-        dedn = de_tid_dt(e=e, a=a, m1=m1, m2=m2) * time_in_Myr
-        dadn = da_tid_dt(e=e, a=a, m1=m1, m2=m2) * time_in_Myr
     return e, a
 
 def get_critical_radii(m1, m2):

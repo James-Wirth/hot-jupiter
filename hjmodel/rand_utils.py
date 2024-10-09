@@ -6,13 +6,13 @@ from scipy.optimize import fsolve
 
 def rand_b() -> float:
     """
-    b: float            Random impact parameter                 au
+    b: float            Random impact parameter (au)
     """
     return np.sqrt(random.random() * B_MAX ** 2)
 
 def rand_v_infty(sigma_v: float) -> float:
     """
-    v_infty: float      Random asymptotic relative speed        au per year
+    v_infty: float      Random asymptotic relative speed (au per year)
     """
     y = random.random()
     sigma_rel = sigma_v * np.sqrt(2)
@@ -39,7 +39,7 @@ def rand_m3() -> float:
     """
     Returns
     ----------
-    m3: float           Mass of perturbing star                 M_solar
+    m3: float           Mass of perturbing star (M_solar)
     """
     y = random.random()
     a = 1.8 / (4 * (M_BR ** 0.6) - 3 * (M_MIN ** 0.6) - (M_BR ** 2.4) * M_MAX ** (-1.8))
@@ -54,7 +54,7 @@ def random_encounter_params(sigma_v: float) -> dict[str, float]:
     """
     Inputs
     ----------
-    sigma_v: float          Isotropic velocity dispersion       au per year
+    sigma_v: float          Isotropic velocity dispersion (au per year)
 
     Returns
     ----------

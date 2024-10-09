@@ -44,9 +44,3 @@ class Plummer:
         inverse_cdf = lambda y: fsolve(lambda r: cdf(r) - y, self.rh)[0]
         return Parallel(n_jobs=NUM_CPUS)(delayed(inverse_cdf)(y)
                                          for y in np.linspace(0, 1, n_samples+1)[1:])
-
-
-if __name__ == '__main__':
-    plummer = Plummer(M0=1.64E6, rt=86, rh=1.91)
-    print(NUM_CPUS)
-    print(plummer.get_radial_distribution())
