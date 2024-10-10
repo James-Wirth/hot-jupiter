@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 from joblib import Parallel, delayed
 from hjmodel.config import *
@@ -106,13 +108,29 @@ class HJModel:
     show_results:           Output the outcome statistics
     """
 
-    def __init__(self, time: int, num_systems: int, res_path: str, res_name: str):
+    def __init__(self, res_path: str, res_name: str):
+        self.time = self.num_systems = 0
+        self.path = f'{res_path}{res_name}.pq'
+        if os.path.exists(self.path):
+            self.df = pd.read_parquet(self.path, engine='pyarrow')
+        else:
+            self.df = None
+
+    def check_overwrite(self):
+        ans = input(f'Data already exists at {self.path}.\nDo you want to overwrite? (Y/n): ')
+        while not ans.lower() in ['y', 'yes', 'n', 'no']:
+            ans = input('Invalid response. Please re-enter (Y/n): ')
+        return ans.lower() in ['y', 'yes']
+
+    def run(self, time: int, num_systems: int):
+        if self.df is not None:
+            if not self.check_overwrite():
+                print('Run interrupted.')
+                return
         self.time = time
         self.num_systems = num_systems
-        self.res_path = res_path
-        self.res_name = res_name
+        print(f'Evaluating N = {self.num_systems} systems (for t = {self.time} Myr)')
 
-    def run(self):
         plummer = Plummer(M0=1.64E6, rt=86, rh=1.91, N=2E6)
         r_vals = plummer.get_radial_distribution(n_samples=self.num_systems)
 
@@ -122,7 +140,7 @@ class HJModel:
         # sys args
         sys = rand_utils.get_random_system_params(n_samples=self.num_systems)
 
-        results = Parallel(n_jobs=-1)(
+        results = Parallel(n_jobs=NUM_CPUS)(
             delayed(eval_system)(*args, self.time) for args in contrib.tzip(*cls, *sys)
         )
         d = {
@@ -136,15 +154,19 @@ class HJModel:
             'm1': sys[2]
         }
         df = pd.DataFrame(data=d)
-        df.to_parquet(f'{self.res_path}{self.res_name}.pq', engine='pyarrow')
+        df.to_parquet(self.path, engine='pyarrow')
+        self.df = df
 
-    def show_results(self):
-        df = pd.read_parquet(f'{self.res_path}{self.res_name}.pq', engine='pyarrow')
-        fracs = [df.loc[df['stopping_condition'] == i].shape[0] for i in range(len(SC_DICT))]
-        for key in SC_DICT:
-            print(f'{key}: {fracs[SC_DICT[key]] / df.shape[0]}')
-        for index, row in df.iterrows():
+    def plot_outcomes(self):
+        for index, row in self.df.iterrows():
             if row['stopping_condition'] != 1:
                 plt.scatter(np.log10(row['final_a']), -np.log10(1 - row['final_e']),
                             color=COLOR_DICT[row['stopping_condition']][0], s=3)
         plt.show()
+
+    def get_outcome_probabilities(self) -> dict[str, float]:
+        return {key: self.df.loc[self.df['stopping_condition'] == SC_DICT[key]].shape[0]/self.df.shape[0]
+                for key in SC_DICT}
+
+    def get_statistics_for_outcome(self, outcomes: list[str], feature: str) -> list[float]:
+        return self.df.loc[self.df['stopping_condition'].isin(SC_DICT[x] for x in outcomes)][feature].to_list()
