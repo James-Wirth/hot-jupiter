@@ -15,7 +15,23 @@ No Migration | None of the above |
 ```python
 from hjmodel import HJModel
 
-model = HJModel(time=TIME_IN_MYR, num_systems=NUM_SYSTEMS, res_path=RES_PATH, res_name=RES_NAME)
-model.run()
+model = HJModel(res_path=RES_PATH, res_name=RES_NAME)
+model.run(time=TIME_IN_MYR, num_systems=NUM_SYSTEMS)
 ```
-The output is saved to the file `RES_NAME.pq` in the directory specified by `RES_PATH`. 
+The output is saved to the file `RES_NAME.pq` in the directory specified by `RES_PATH`. The results of a HJModel instance can be accessed by `model.df`, although we provide a few in-built methods for summary statistics:
+
+```python
+outcome_probs = model.get_outcome_probabilities()
+"""
+Returns: dict[str, float]    {'I': f_i, 'TD': f_td, 'HJ': f_hj, 'WJ': f_wj, 'NM': f_nm}
+"""
+
+stats = get_stats_for_outcome(outcomes=OUTCOMES, feature=FEATURE)
+"""
+outcomes: list[str]          subset of ['I', 'TD', 'HJ', 'WJ', 'NM']
+feature:  str                in ['r', 'e_init', 'a_init', 'stopping_time', 'final_e', 'final_e', 'm1']
+--------
+Returns: list[float]
+"""   
+```
+
