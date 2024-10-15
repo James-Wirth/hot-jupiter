@@ -2,7 +2,7 @@ from scipy import integrate
 from hjmodel.config import *
 
 class Analytic:
-    def __init__(self, n_tot, sigma_v, m1, m2, e_init, a_init, total_time):
+    def __init__(self, n_tot, sigma_v, e_init, a_init, m1, m2, total_time):
         self.n_tot = n_tot
         self.sigma_v = sigma_v
         self.m1 = m1

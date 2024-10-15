@@ -30,9 +30,10 @@ def get_outcome_dict(num_systems, *args):
 
 def save_res_for_param(param_name, param_values, num_systems):
     d = []
+    copy = CANON.copy()
     for i in range(len(param_values)):
-        CANON[param_name] = param_values[i]
-        outcome_dict = get_outcome_dict(num_systems[i], *CANON.values())
+        copy[param_name] = param_values[i]
+        outcome_dict = get_outcome_dict(num_systems[i], *copy.values())
         error = 1/np.sqrt(num_systems[i])
         d.append(
             {
@@ -47,16 +48,30 @@ def vary_density():
     param_values = np.geomspace(1E-4, 1, 10)
     def num_systems_map(param_value):
         if 1E-4 <= param_value < 1E-3:
-            return 2000
+            return 160000
         elif 1E-3 <= param_value < 1E-2:
-            return 2000
+            return 90000
         elif 1E-2 <= param_value < 1E-1:
-            return 2000
+            return 40000
         else:
-            return 2000
+            return 10000
     num_systems = np.vectorize(num_systems_map)(param_values)
     save_res_for_param(param_name='n_tot', param_values=param_values, num_systems=num_systems)
     df = pd.read_parquet(f'test_data/test_model_param_data/test_n_tot.pq', engine='pyarrow')
+    print(df.head())
+
+def vary_sigma():
+    param_values = np.geomspace(0.211, 6.33, 10)
+    num_systems = [40000] * 10
+    save_res_for_param(param_name='sigma_v', param_values=param_values, num_systems=num_systems)
+    df = pd.read_parquet(f'test_data/test_model_param_data/test_sigma_v.pq', engine='pyarrow')
+    print(df.head())
+
+def vary_a_init():
+    param_values = np.geomspace(1, 30, 10)
+    num_systems = [90000] * 10
+    save_res_for_param(param_name='a_init', param_values=param_values, num_systems=num_systems)
+    df = pd.read_parquet(f'test_data/test_model_param_data/test_a_init.pq', engine='pyarrow')
     print(df.head())
 
 def add_fig_to_ax(ax, param_name: str,
@@ -64,17 +79,17 @@ def add_fig_to_ax(ax, param_name: str,
                   xlabel: str,
                   clip: dict[str: int]):
     df = pd.read_parquet(f'test_data/test_model_param_data/test_{param_name}.pq', engine='pyarrow')
-    for outcome in SC_DICT:
+    for outcome in SC_DICT.values():
         if clip[outcome] == 0:
-            ax.plot(df[param_name], df[outcome],
-                    '-s', color=COLOR_DICT[SC_DICT[outcome]][0],
+            ax.plot(df[param_name], df[f'{outcome}'],
+                    '-s', color=COLOR_DICT[outcome][0],
                     label=outcome,
-                    zorder=10 - SC_DICT[outcome], markersize=3)
+                    zorder=10 - outcome, markersize=3)
         else:
-            ax.plot(df[param_name][0:-clip[outcome]], df[outcome][0:-clip[outcome]],
-                    '-s', color=COLOR_DICT[SC_DICT[outcome]][0],
+            ax.plot(df[param_name][0:-clip[outcome]], df[f'{outcome}'][0:-clip[outcome]],
+                    '-s', color=COLOR_DICT[outcome][0],
                     label=outcome,
-                    zorder=10-SC_DICT[outcome], markersize=3)
+                    zorder=10-outcome, markersize=3)
 
     # get analytic predictions
     param_values = np.geomspace(xrange[0], xrange[1], 1000)
@@ -85,7 +100,7 @@ def add_fig_to_ax(ax, param_name: str,
         analytic_res.append(Analytic(*copy.values()).get_analytic_probabilities())
     analytic_res_T = np.array(analytic_res).T
     for i in range(analytic_res_T.shape[0]):
-        ax.plot(param_values, analytic_res_T[i], linestyle='dotted', color=COLOR_DICT[i])
+        ax.plot(param_values, analytic_res_T[i], linestyle='dotted', color=COLOR_DICT[i][0])
 
     ax.set_xscale('log')
     ax.set_yscale('log')
@@ -96,16 +111,16 @@ def add_fig_to_ax(ax, param_name: str,
 def save_fig():
     fig, (ax1, ax2, ax3) = plt.subplots(nrows=1, ncols=3, figsize=(8, 3), sharey=True)
 
-    clip = {'NM': 3,'I': 0,'TD': 0,'HJ': 0,'WJ': 3}
+    clip = {SC_DICT['NM']: 3,SC_DICT['I']: 0,SC_DICT['TD']: 0,SC_DICT['HJ']: 0,SC_DICT['WJ']: 3}
     add_fig_to_ax(ax1, param_name='n_tot',
                   xrange=[1E-4, 1], yrange=[1E-4, 1],
                   xlabel='$n$ / $\\mathrm{pc}^{-3}$', clip=clip)
-    add_fig_to_ax(ax2, param_name='n_tot',
-                  xrange=[1E-4, 1], yrange=[1E-4, 1],
-                  xlabel='$n$ / $\\mathrm{pc}^{-3}$', clip=clip)
-    add_fig_to_ax(ax3, param_name='n_tot',
-                  xrange=[1E-4, 1], yrange=[1E-4, 1],
-                  xlabel='$n$ / $\\mathrm{pc}^{-3}$', clip=clip)
+    add_fig_to_ax(ax2, param_name='sigma_v',
+                  xrange=[0.211, 6.33], yrange=[1E-4, 1],
+                  xlabel='$\\sigma$ / $\\mathrm{km} \\mathrm{s}^{-1}$', clip=clip)
+    add_fig_to_ax(ax3, param_name='a_init',
+                  xrange=[1, 30], yrange=[1E-4, 1],
+                  xlabel='$a_0$ / au', clip=clip)
 
     # style figure
     ax1.plot(np.nan, np.nan, linestyle='dotted', color='black', label='Analytic')
@@ -117,4 +132,6 @@ def save_fig():
 
 if __name__ == '__main__':
     vary_density()
-    # save_fig()
+    vary_sigma()
+    vary_a_init()
+    save_fig()
