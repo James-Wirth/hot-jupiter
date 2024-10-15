@@ -20,6 +20,25 @@ def get_true_anomaly(mean_anom: float, e:float) -> float:
     beta = e / (1 + np.sqrt(1 - e ** 2))
     return ecc_anom + 2 * np.arctan((beta * np.sin(ecc_anom)) / (1 - beta * np.cos(ecc_anom)))
 
+def get_pert_orbit_params(v_infty: float, b: float, m1: float, m2: float) -> (float, float, float):
+    a_pert = -G * (m1 + m2) / (v_infty ** 2)
+    e_pert = np.sqrt(1 + (b / a_pert) ** 2)
+    rp = -a_pert * (e_pert - 1)
+    return a_pert, e_pert, rp
+
+def get_int_params(a_pert: float, e_pert: float, rp: float):
+    # max true anomaly (at infinity)
+    max_anomaly = np.arccos(-1 / e_pert)
+    # boundary points of perturbing trajectory calculated from parameter XI
+    r_crit = rp / (XI ** (1 / 3))
+    theta_crit = np.arccos((1 / e_pert) * (((a_pert * (1 - e_pert ** 2)) / r_crit) - 1))
+    alpha = theta_crit / max_anomaly
+    # t = time until peri-center
+    F = np.arccosh((e_pert + np.cos(alpha * max_anomaly)) / (1 + e_pert * np.cos(alpha * max_anomaly)))
+    t = (e_pert * np.sinh(F) - F) * (-1 * a_pert) ** (3 / 2)
+    # t_int, -f0
+    return 2*t, -alpha*max_anomaly
+
 def de_HR(v_infty: float, b: float, Omega: float, inc: float, omega: float,
           e: float, a: float, m1: float, m2: float, m3:float) -> float:
     """
@@ -44,9 +63,7 @@ def de_HR(v_infty: float, b: float, Omega: float, inc: float, omega: float,
     """
 
     m123 = m1 + m2 + m3
-    a_pert = -G * (m1 + m2) / (v_infty ** 2)
-    e_pert = np.sqrt(1 + (b/a_pert)**2)
-    rp = -a_pert * (e_pert - 1)
+    a_pert, e_pert, rp = get_pert_orbit_params(v_infty, b, m1, m2)
     y = e * np.sqrt(1 - e ** 2) * (m3 / (np.sqrt((m1 + m2) * m123)))
     alpha = -1 * (15/4) * ((1+e_pert)**(-3/2))
     chi = np.arccos(-1/e_pert) + np.sqrt(e_pert**2-1)
@@ -82,15 +99,8 @@ def de_SIM_rand_phase(v_infty: float, b: float, Omega: float, inc: float, omega:
     """
 
     # calculate orbital parameters of perturbing trajectory
-    a_pert = -G * (m1 + m2) / (v_infty ** 2)
-    e_pert = np.sqrt(1+(b/a_pert)**2)
-    rp = -a_pert*(e_pert-1)
-    max_anomaly = np.arccos(-1/e_pert)
-
-    # boundary points of perturbing trajectory calculated from parameter XI
-    r_crit = rp/(XI ** (1 / 3))
-    theta_crit = np.arccos((1/e_pert)*(((a_pert*(1-e_pert**2))/r_crit) - 1))
-    alpha = theta_crit/max_anomaly
+    a_pert, e_pert, rp = get_pert_orbit_params(v_infty=v_infty, b=b, m1=m1, m2=m2)
+    t_int, f0 = get_int_params(a_pert=a_pert, e_pert=e_pert, rp=rp)
 
     # uniform range of possible starting mean anomalies for planetary orbit
     mean_anoms = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)
@@ -101,13 +111,9 @@ def de_SIM_rand_phase(v_infty: float, b: float, Omega: float, inc: float, omega:
     sim = rebound.Simulation()
     sim.add(m=m1)
     sim.add(m=m2, a=a, e=e, f=np.random.choice(true_anoms))
-    sim.add(m=m3, a=a_pert, e=e_pert, f=-alpha*max_anomaly, Omega=Omega, inc=inc, omega=omega)
+    sim.add(m=m3, a=a_pert, e=e_pert, f=f0, Omega=Omega, inc=inc, omega=omega)
     sim.move_to_com()
-
-    # determine necessary integration time
-    F = np.arccosh((e_pert+np.cos(alpha*max_anomaly))/(1+e_pert*np.cos(alpha*max_anomaly)))
-    t = (e_pert*np.sinh(F)-F)*(-1*a_pert)**(3/2)
-    sim.integrate(2*t)
+    sim.integrate(t_int)
 
     # calculate final orbital parameters of planetary system
     o_binary = sim.particles[1].orbit()
@@ -116,19 +122,20 @@ def de_SIM_rand_phase(v_infty: float, b: float, Omega: float, inc: float, omega:
 
     # deallocate simulation from memory
     sim = None
-
+    
     return delta_e_sim, delta_a_sim
 
-def pert_orbit_params(v_infty: float, b: float, m1: float, m2: float) -> (float, float, float):
-    a_pert = -G * (m1 + m2) / (v_infty ** 2)
-    e_pert = np.sqrt(1 + (b / a_pert) ** 2)
-    rp = -a_pert * (e_pert - 1)
-    return a_pert, e_pert, rp
+def tidal_param(v_infty: float, b: float, a: float, m1: float, m2: float) -> bool:
+    _, _, rp = get_pert_orbit_params(v_infty, b, m1, m2)
+    return rp/a
 
-def tidal_condition(v_infty: float, b: float, a: float, m1: float, m2: float) -> bool:
-    _, _, rp = pert_orbit_params(v_infty, b, m1, m2)
-    return True if rp/a > 10 else False
+def slow_param(v_infty: float, b: float, a: float, m1: float, m2: float) -> bool:
+    a_pert, e_pert, rp = get_pert_orbit_params(v_infty, b, m1, m2)
+    t_int, _ = get_int_params(a_pert=a_pert, e_pert=e_pert, rp=rp)
+    t_per = (a**3 / (m1 + m2))**(1/2)
+    return t_int/t_per
 
+"""
 def chi_condition(v_infty: float, b: float, m1: float, m2: float, m3: float,
                   sigma_v: float) -> bool:
     _, e_pert, rp = pert_orbit_params(v_infty=v_infty, b=b, m1=m1, m2=m2)
@@ -136,11 +143,12 @@ def chi_condition(v_infty: float, b: float, m1: float, m2: float, m3: float,
     e_max = np.sqrt(1 + (B_MAX ** 2 * (np.sqrt(2) * sigma_v) ** 4) / (G ** 2 * M_MIN ** 2))
     chi_min = (1 / np.sqrt(1 + e_max))
     return True if chi > chi_min else False
+"""
 
 def is_analytic_valid(v_infty: float, b: float, Omega: None, inc: None, omega: None,
           e: None, a: float, m1: float, m2: float, m3:float, sigma_v: float) -> bool:
-    return True if (tidal_condition(v_infty=v_infty, b=b, a=a, m1=m1, m2=m2)
-                    and chi_condition(v_infty=v_infty, b=b, m1=m1, m2=m2, m3=m3, sigma_v=sigma_v)) else False
+    return True if (tidal_param(v_infty=v_infty, b=b, a=a, m1=m1, m2=m2) > T_MIN
+                    and slow_param(v_infty=v_infty, b=b, a=a, m1=m1, m2=m2) > S_MIN) else False
 
 def f(e: float) -> float:
     num_coeffs = np.array([1, 45/14, 8, 685/224, 255/488, 25/1792])

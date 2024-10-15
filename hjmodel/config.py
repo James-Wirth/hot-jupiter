@@ -6,6 +6,10 @@ G = 4 * np.pi ** 2
 INIT_PHASES = 20
 XI = 0.001
 
+# hybrid model critical parameters
+T_MIN = 20
+S_MIN = 200
+
 # unit conversions
 AU_PER_PSC = 206265
 
