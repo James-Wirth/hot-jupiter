@@ -122,7 +122,7 @@ def de_SIM_rand_phase(v_infty: float, b: float, Omega: float, inc: float, omega:
 
     # deallocate simulation from memory
     sim = None
-    
+
     return delta_e_sim, delta_a_sim
 
 def tidal_param(v_infty: float, b: float, a: float, m1: float, m2: float) -> bool:
@@ -134,16 +134,6 @@ def slow_param(v_infty: float, b: float, a: float, m1: float, m2: float) -> bool
     t_int, _ = get_int_params(a_pert=a_pert, e_pert=e_pert, rp=rp)
     t_per = (a**3 / (m1 + m2))**(1/2)
     return t_int/t_per
-
-"""
-def chi_condition(v_infty: float, b: float, m1: float, m2: float, m3: float,
-                  sigma_v: float) -> bool:
-    _, e_pert, rp = pert_orbit_params(v_infty=v_infty, b=b, m1=m1, m2=m2)
-    chi = np.sqrt(((m1 + m2 + m3)/(m1 + m2))) * (1+e_pert)**(-0.5)
-    e_max = np.sqrt(1 + (B_MAX ** 2 * (np.sqrt(2) * sigma_v) ** 4) / (G ** 2 * M_MIN ** 2))
-    chi_min = (1 / np.sqrt(1 + e_max))
-    return True if chi > chi_min else False
-"""
 
 def is_analytic_valid(v_infty: float, b: float, Omega: None, inc: None, omega: None,
           e: None, a: float, m1: float, m2: float, m3:float, sigma_v: float) -> bool:

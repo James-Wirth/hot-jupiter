@@ -45,31 +45,22 @@ def save_res_for_param(param_name, param_values, num_systems):
     df.to_parquet(f'test_data/test_model_param_data/test_{param_name}.pq', engine='pyarrow')
 
 def vary_density():
-    param_values = np.geomspace(1E-4, 1, 10)
-    def num_systems_map(param_value):
-        if 1E-4 <= param_value < 1E-3:
-            return 160000
-        elif 1E-3 <= param_value < 1E-2:
-            return 90000
-        elif 1E-2 <= param_value < 1E-1:
-            return 40000
-        else:
-            return 10000
-    num_systems = np.vectorize(num_systems_map)(param_values)
+    param_values = np.geomspace(1E-4, 1, 20)
+    num_systems = [10000] * 20
     save_res_for_param(param_name='n_tot', param_values=param_values, num_systems=num_systems)
     df = pd.read_parquet(f'test_data/test_model_param_data/test_n_tot.pq', engine='pyarrow')
     print(df.head())
 
 def vary_sigma():
-    param_values = np.geomspace(0.211, 6.33, 10)
-    num_systems = [40000] * 10
+    param_values = np.geomspace(0.211, 6.33, 20)
+    num_systems = [10000] * 20
     save_res_for_param(param_name='sigma_v', param_values=param_values, num_systems=num_systems)
     df = pd.read_parquet(f'test_data/test_model_param_data/test_sigma_v.pq', engine='pyarrow')
     print(df.head())
 
 def vary_a_init():
-    param_values = np.geomspace(1, 30, 10)
-    num_systems = [90000] * 10
+    param_values = np.geomspace(1, 30, 20)
+    num_systems = [10000] * 20
     save_res_for_param(param_name='a_init', param_values=param_values, num_systems=num_systems)
     df = pd.read_parquet(f'test_data/test_model_param_data/test_a_init.pq', engine='pyarrow')
     print(df.head())
