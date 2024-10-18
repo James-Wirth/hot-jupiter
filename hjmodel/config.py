@@ -8,7 +8,7 @@ XI = 1E-4
 
 # hybrid model critical parameters
 T_MIN = 20
-S_MIN = 200
+S_MIN = 300
 
 # unit conversions
 AU_PER_PSC = 206265

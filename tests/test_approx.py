@@ -21,8 +21,8 @@ def eval_pert(sigma_v: float, e: float, a: float, m1: float, m2: float):
         'm2':       m2,
         'm3':       rand_params['m3']
     }
-    tidal_param = model_utils.tidal_param(*(args[x] for x in ['v_infty', 'b', 'a', 'm1', 'm2']))
-    slow_param = model_utils.slow_param(*(args[x] for x in ['v_infty', 'b', 'a', 'm1', 'm2']))
+    tidal_param = model_utils.tidal_param(*(args[x] for x in ['v_infty', 'b', 'a_init', 'm1', 'm2']))
+    slow_param = model_utils.slow_param(*(args[x] for x in ['v_infty', 'b', 'a_init', 'm1', 'm2']))
 
     de_sim = np.abs(model_utils.de_SIM_rand_phase(*args.values())[0])
     de_hr = np.abs(model_utils.de_HR(*args.values()))
@@ -49,7 +49,7 @@ def get_approx(sigma_v: float, num_systems: int):
 def thresh_mean(arr):
     return np.mean(arr) if arr.shape[0] > 5 else np.nan
 
-def test_approx(sigma_v=1.266, num_systems=500000):
+def test_approx(sigma_v=1.266, num_systems=100000):
     path = f'test_data/test_approx_data/test_approx_{sigma_v}.pq'
     if not os.path.exists(path):
         get_approx(sigma_v=sigma_v, num_systems=num_systems)
