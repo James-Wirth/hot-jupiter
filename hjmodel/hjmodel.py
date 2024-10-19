@@ -6,6 +6,7 @@ from hjmodel import model_utils, rand_utils
 from hjmodel.cluster import Plummer, DynamicPlummer
 from tqdm import contrib
 import matplotlib.pyplot as plt
+import time
 
 def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
                 r: float, cluster: DynamicPlummer, total_time: int) -> list:
@@ -18,6 +19,7 @@ def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
     stopping_condition = SC_DICT['NM']
 
     while current_time < total_time:
+
         # get environment vars from cluster object
         local_n_tot = cluster.number_density(r, current_time)
         local_sigma_v = cluster.isotropic_velocity_dispersion(r, current_time)
@@ -237,6 +239,7 @@ class HJModel:
         results = Parallel(n_jobs=NUM_CPUS)(
             delayed(eval_system_dynamic)(*args, plummer, self.time) for args in contrib.tzip(*sys, r_vals)
         )
+
         d = {
             'r': r_vals,
             'final_e': [row[0] for row in results],
@@ -264,3 +267,4 @@ class HJModel:
 
     def get_statistics_for_outcome(self, outcomes: list[str], feature: str) -> list[float]:
         return self.df.loc[self.df['stopping_condition'].isin(SC_DICT[x] for x in outcomes)][feature].to_list()
+

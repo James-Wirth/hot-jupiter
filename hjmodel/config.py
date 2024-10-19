@@ -4,10 +4,10 @@ import multiprocessing
 # model constants
 G = 4 * np.pi ** 2
 INIT_PHASES = 500
-XI = 1E-4
+XI = 1E-3
 
 # hybrid model critical parameters
-T_MIN = 20
+T_MIN = 15
 S_MIN = 300
 
 # unit conversions
@@ -43,7 +43,4 @@ COLOR_DICT = {
     SC_DICT['WJ']: ['orange', 'o']
 }
 
-try:
-    NUM_CPUS = multiprocessing.cpu_count()
-except NotImplementedError:
-    NUM_CPUS = 2
+NUM_CPUS = -1

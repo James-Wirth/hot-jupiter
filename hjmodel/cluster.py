@@ -104,6 +104,7 @@ class DynamicPlummer:
         return Parallel(n_jobs=NUM_CPUS)(delayed(inverse_cdf)(y)
                                          for y in np.linspace(0, 1, n_samples+1)[1:])
 
+"""
 if __name__ == '__main__':
     plummer = DynamicPlummer(M0=(1.64E6, 0.9E6),
                              rt=(86, 70),
@@ -129,3 +130,4 @@ if __name__ == '__main__':
     ax2.set_ylabel('Time / Gyr')
 
     plt.show()
+"""
