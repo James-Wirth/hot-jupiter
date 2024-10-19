@@ -1,10 +1,9 @@
 from hjmodel import HJModel
+import sys
 import matplotlib.pyplot as plt
 
-RES_PATH = '/Users/jameswirth/PycharmProjects/hotjupiter-multiprocess/data/'
-
 if __name__ == '__main__':
-    model = HJModel(res_path=RES_PATH, res_name='exp_data_dynamic')
+    model = HJModel(res_path=sys.argv[0], res_name='exp_data_dynamic')
     model.run(time=12000, num_systems=200000)
     
     """
