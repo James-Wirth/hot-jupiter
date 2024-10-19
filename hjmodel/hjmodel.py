@@ -166,9 +166,9 @@ class HJModel:
     show_results:           Output the outcome statistics
     """
 
-    def __init__(self, res_path: str, res_name: str):
+    def __init__(self, res_path: str):
         self.time = self.num_systems = 0
-        self.path = f'{res_path}{res_name}.pq'
+        self.path = res_path
         if os.path.exists(self.path):
             self.df = pd.read_parquet(self.path, engine='pyarrow')
         else:

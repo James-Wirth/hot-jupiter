@@ -1,10 +1,13 @@
 from hjmodel import HJModel
 import sys
+import os
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
-    model = HJModel(res_path=sys.argv[0], res_name='exp_data_dynamic')
-    model.run(time=12000, num_systems=200000)
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    res_path = os.path.join(dir_path, 'data', 'exp_data_dynamic.pq')
+    model = HJModel(res_path=res_path)
+    model.run(time=12000, num_systems=250000)
     
     """
     model.plot_outcomes()
@@ -16,4 +19,5 @@ if __name__ == '__main__':
     plt.hist(stats)
     plt.show()
     """
+
 
