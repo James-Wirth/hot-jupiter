@@ -4,7 +4,7 @@ import multiprocessing
 # model constants
 G = 4 * np.pi ** 2
 INIT_PHASES = 500
-XI = 1E-4
+XI = 1E-3
 
 # hybrid model critical parameters
 T_MIN = 15

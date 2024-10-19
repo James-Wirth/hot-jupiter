@@ -7,7 +7,7 @@ if __name__ == '__main__':
     dir_path = os.path.dirname(os.path.realpath(__file__))
     res_path = os.path.join(dir_path, 'data', 'exp_data_dynamic.pq')
     model = HJModel(res_path=res_path)
-    model.run_dynamic(time=12000, num_systems=100000)
+    model.run_dynamic(time=12000, num_systems=200000)
 
     """
     model.plot_outcomes()
