@@ -4,7 +4,7 @@ import multiprocessing
 # model constants
 G = 4 * np.pi ** 2
 INIT_PHASES = 500
-XI = 1E-3
+XI = 1E-4
 
 # hybrid model critical parameters
 T_MIN = 15
@@ -36,11 +36,19 @@ SC_DICT = {
 }
 
 COLOR_DICT = {
-    SC_DICT['NM']: ['magenta', 'm'],
+    SC_DICT['NM']: ['gray', 'm'],
     SC_DICT['I']: ['green', 'g'],
     SC_DICT['TD']: ['blue', 'b'],
     SC_DICT['HJ']: ['red', 'r'],
     SC_DICT['WJ']: ['orange', 'o']
+}
+
+PALETTE = {
+    0: 'gray',
+    1: 'green',
+    2: 'blue',
+    3: 'red',
+    4: 'orange'
 }
 
 NUM_CPUS = -1

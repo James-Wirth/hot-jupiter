@@ -4,6 +4,9 @@ import numpy as np
 import rebound
 from scipy.optimize import fsolve
 
+# uniform range of possible starting mean anomalies for planetary orbit
+mean_anoms = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)
+
 def kepler(E: float, e: float) -> float:
     """
     Calculates the mean anomaly corresponding to the
@@ -11,14 +14,24 @@ def kepler(E: float, e: float) -> float:
     """
     return E - e*np.sin(E)
 
+def true_anomaly_approximation(mean_anom: float, e: float) -> float:
+    T1 = mean_anom
+    T2 = (2*e - 0.25 * e**3) * np.sin(mean_anom)
+    T3 = ((5/4) * e**2) * np.sin(2*mean_anom)
+    T4 = ((13/12) * e**3) * np.sin(3*mean_anom)
+    return T1 + T2 + T3 + T4
+
 def get_true_anomaly(mean_anom: float, e:float) -> float:
     """
     Calculates the true anomaly corresponding to the
     mean anomaly mean_anom for an orbit with eccentricity e
     """
-    ecc_anom, *info = fsolve(lambda E: kepler(E, e) - mean_anom, 0)
-    beta = e / (1 + np.sqrt(1 - e ** 2))
-    return ecc_anom + 2 * np.arctan((beta * np.sin(ecc_anom)) / (1 - beta * np.cos(ecc_anom)))
+    if e < 0.3:
+        return true_anomaly_approximation(mean_anom, e)
+    else:
+        ecc_anom, *info = fsolve(lambda E: kepler(E, e) - mean_anom, 0)
+        beta = e / (1 + np.sqrt(1 - e ** 2))
+        return ecc_anom + 2 * np.arctan((beta * np.sin(ecc_anom)) / (1 - beta * np.cos(ecc_anom)))
 
 def get_pert_orbit_params(v_infty: float, b: float, m1: float, m2: float) -> (float, float, float):
     a_pert = -G * (m1 + m2) / (v_infty ** 2)
@@ -73,8 +86,8 @@ def de_HR(v_infty: float, b: float, Omega: float, inc: float, omega: float,
     Theta3 = 2 * np.cos(inc) * np.sin(2 * omega) * np.cos(2 * Omega)
     return alpha*y*((a / rp) ** (3 / 2))*(Theta1 * chi + (Theta2 + Theta3) * psi)
 
-def de_SIM_rand_phase(v_infty: float, b: float, Omega: float, inc: float, omega: float,
-                      e: float, a: float, m1: float, m2: float, m3: float) -> (float, float):
+def de_sim(v_infty: float, b: float, Omega: float, inc: float, omega: float,
+           e: float, a: float, m1: float, m2: float, m3: float) -> (float, float):
     """
     Calculates the N-body eccentricity and semi-major axis excitations
     using the REBOUND code
@@ -102,15 +115,12 @@ def de_SIM_rand_phase(v_infty: float, b: float, Omega: float, inc: float, omega:
     a_pert, e_pert, rp = get_pert_orbit_params(v_infty=v_infty, b=b, m1=m1, m2=m2)
     t_int, f0 = get_int_params(a_pert=a_pert, e_pert=e_pert, rp=rp)
 
-    # uniform range of possible starting mean anomalies for planetary orbit
-    mean_anoms = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)
-    # Parallelize the computation of corresponding true anomalies
-    true_anoms = Parallel(n_jobs=NUM_CPUS)(delayed(get_true_anomaly)(mean_anom, e) for mean_anom in mean_anoms)
+    f_phase = get_true_anomaly(np.random.choice(mean_anoms), e)
 
     # configure REBOUND simulation
     sim = rebound.Simulation()
     sim.add(m=m1)
-    sim.add(m=m2, a=a, e=e, f=np.random.choice(true_anoms))
+    sim.add(m=m2, a=a, e=e, f=f_phase)
     sim.add(m=m3, a=a_pert, e=e_pert, f=f0, Omega=Omega, inc=inc, omega=omega)
     sim.move_to_com()
     sim.integrate(t_int)

@@ -7,6 +7,10 @@ from tqdm import contrib
 from hjmodel.config import *
 from hjmodel import model_utils, rand_utils
 
+import scienceplots
+plt.style.use(['science','nature'])
+
+
 def eval_pert(sigma_v: float, e: float, a: float, m1: float, m2: float):
     rand_params = rand_utils.random_encounter_params(sigma_v=sigma_v)
     args = {
@@ -24,7 +28,7 @@ def eval_pert(sigma_v: float, e: float, a: float, m1: float, m2: float):
     tidal_param = model_utils.tidal_param(*(args[x] for x in ['v_infty', 'b', 'a_init', 'm1', 'm2']))
     slow_param = model_utils.slow_param(*(args[x] for x in ['v_infty', 'b', 'a_init', 'm1', 'm2']))
 
-    de_sim = np.abs(model_utils.de_SIM_rand_phase(*args.values())[0])
+    de_sim = np.abs(model_utils.de_sim(*args.values())[0])
     de_hr = np.abs(model_utils.de_HR(*args.values()))
 
     err = np.abs(de_sim - de_hr) / de_hr
@@ -62,8 +66,8 @@ def test_approx(sigma_v=1.266, num_systems=100000):
                               statistic=thresh_mean, bins=[t_bins, s_bins])
 
     fig, axs = plt.subplots(1, 2, gridspec_kw={"width_ratios": [1, 0.05]})
-    fig.set_size_inches(2.5, 2)
-    fig.subplots_adjust(wspace=0.25)
+    fig.set_size_inches(4, 2.5)
+    fig.subplots_adjust(wspace=0.01)
 
     img = axs[0].imshow(ret.statistic.T, origin='lower', extent=(0, max_t, 0, max_s),
                         cmap='RdYlBu_r', aspect=max_t / max_s, vmin=-2, vmax=0.5)
@@ -74,7 +78,12 @@ def test_approx(sigma_v=1.266, num_systems=100000):
     axs[0].legend(frameon=True)
     axs[0].set_facecolor('lightgray')
 
+    axs[0].axvline(x=15, ymin=300/1000, linestyle='dashed', color='black')
+    axs[0].axhline(y=300, xmin=15/60, linestyle='dashed', color='black')
+    axs[0].annotate('$\\mathcal{D}$', xy=(20, 400), textcoords='data', fontsize=14)
+
     cb2 = plt.colorbar(img, cax=axs[1], ax=[axs[0]])
     cb2.set_label(label='$\log \Delta$')
 
+    # fig.tight_layout()
     plt.savefig(f'test_data/test_approx_data/test_approx_{sigma_v}.pdf', format='pdf', bbox_inches="tight")

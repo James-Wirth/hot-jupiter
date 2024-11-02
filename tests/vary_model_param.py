@@ -10,6 +10,9 @@ from hjmodel.hjmodel import eval_system
 from hjmodel import model_utils, rand_utils
 from test_data.test_model_param_data.analytic_results import Analytic
 
+import scienceplots
+plt.style.use(['science','nature'])
+
 # canonical values (unless the parameter in question is being varied)
 CANON = {
     'n_tot': 2.5E-3,
@@ -46,30 +49,23 @@ def save_res_for_param(param_name, param_values, num_systems):
 
 def vary_density():
     param_values = np.geomspace(1E-4, 1, 20)
-    num_systems = [10000] * 20
+    num_systems = [40000] * 20
     save_res_for_param(param_name='n_tot', param_values=param_values, num_systems=num_systems)
     df = pd.read_parquet(f'test_data/test_model_param_data/test_n_tot.pq', engine='pyarrow')
     print(df.head())
 
 def vary_sigma():
-    param_values = np.geomspace(0.211, 6.33, 20)
-    num_systems = [10000] * 20
+    param_values = np.linspace(0.211, 6.33, 20)
+    num_systems = [40000] * 20
     save_res_for_param(param_name='sigma_v', param_values=param_values, num_systems=num_systems)
     df = pd.read_parquet(f'test_data/test_model_param_data/test_sigma_v.pq', engine='pyarrow')
     print(df.head())
 
 def vary_a_init():
-    param_values = np.geomspace(1, 1E1, 20)
-    num_systems = [10000] * 20
+    param_values = np.linspace(1, 10, 20)
+    num_systems = [40000] * 20
     save_res_for_param(param_name='a_init', param_values=param_values, num_systems=num_systems)
     df = pd.read_parquet(f'test_data/test_model_param_data/test_a_init.pq', engine='pyarrow')
-    print(df.head())
-
-def vary_m1():
-    param_values = np.geomspace(0.08, 0.8, 20)
-    num_systems = [10000] * 20
-    save_res_for_param(param_name='m1', param_values=param_values, num_systems=num_systems)
-    df = pd.read_parquet(f'test_data/test_model_param_data/test_m1.pq', engine='pyarrow')
     print(df.head())
 
 def add_fig_to_ax(ax, param_name: str,
@@ -77,16 +73,20 @@ def add_fig_to_ax(ax, param_name: str,
                   xlabel: str,
                   clip: dict[str: int]):
     df = pd.read_parquet(f'test_data/test_model_param_data/test_{param_name}.pq', engine='pyarrow').sort_values(by=param_name)
+    if param_name == 'sigma_v':
+        df[param_name] = df[param_name]/0.211
+    elif param_name == 'n_tot':
+        df[param_name] = df[param_name] * 10**6
     for outcome in SC_DICT.values():
         if clip[outcome] == 0:
             ax.plot(df[param_name], df[f'{outcome}'],
                     color=COLOR_DICT[outcome][0],
-                    label=outcome,
+                    label={v: k for k, v in SC_DICT.items()}[outcome],
                     zorder=10 - outcome)
         else:
             ax.plot(df[param_name][0:-clip[outcome]], df[f'{outcome}'][0:-clip[outcome]],
                     color=COLOR_DICT[outcome][0],
-                    label=outcome,
+                    label={v: k for k, v in SC_DICT.items()}[outcome],
                     zorder=10-outcome)
 
     # get analytic predictions
@@ -97,60 +97,75 @@ def add_fig_to_ax(ax, param_name: str,
         copy[param_name] = param_values[i]
         analytic_res.append(Analytic(*copy.values()).get_analytic_probabilities())
     analytic_res_T = np.array(analytic_res).T
+
+    if param_name == 'sigma_v':
+        param_values = param_values/0.211
+        xrange = (xrange[0] / 0.211, xrange[1] / 0.211)
+    elif param_name == 'n_tot':
+        param_values = param_values * 10**6
+        xrange = (xrange[0] * 10**6, xrange[1] * 10**6)
     for i in range(analytic_res_T.shape[0]):
         ax.plot(param_values, analytic_res_T[i], linestyle='dotted', color=COLOR_DICT[i][0])
-
     ax.set_xlim(*xrange)
     ax.set_ylim(*yrange)
-    ax.set_xlabel(xlabel)
+
+    if xlabel != '':
+        ax.set_xlabel(xlabel)
 
 def save_fig():
-    fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(8, 4), gridspec_kw={'height_ratios':[1.5,1],
-                                                                           'hspace':0.05,
-                                                                           'wspace':0.15})
+    fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(8, 3), gridspec_kw={'height_ratios':[1,1],
+                                                                           'hspace':0.15,
+                                                                           'wspace':0.05})
 
     clip = {SC_DICT['NM']: 3,SC_DICT['I']: 0,SC_DICT['TD']: 0,SC_DICT['HJ']: 0,SC_DICT['WJ']: 3}
     add_fig_to_ax(axs[0,0], param_name='n_tot',
                   xrange=[1E-4, 1], yrange=[0, 1],
-                  xlabel='$n$ / $\\mathrm{pc}^{-3}$', clip=clip)
+                  xlabel='', clip=clip)
     axs[0,0].set_xscale('log')
     axs[0,0].set_xticks([])
     add_fig_to_ax(axs[1, 0], param_name='n_tot',
-                  xrange=[1E-4, 1], yrange=[0, 5E-2],
+                  xrange=[1E-4, 1], yrange=[1E-3, 1E-1],
                   xlabel='$n$ / $\\mathrm{pc}^{-3}$', clip=clip)
     axs[1, 0].set_xscale('log')
+    axs[1, 0].set_yscale('log')
 
     clip = {SC_DICT['NM']: 0, SC_DICT['I']: 0, SC_DICT['TD']: 0, SC_DICT['HJ']: 0, SC_DICT['WJ']: 0}
     add_fig_to_ax(axs[0,1], param_name='sigma_v',
                   xrange=[0.211, 6.33], yrange=[0, 1],
-                  xlabel='$\\sigma$ / $\\mathrm{km} \\mathrm{s}^{-1}$', clip=clip)
+                  xlabel='', clip=clip)
     axs[0, 1].set_xticks([])
     add_fig_to_ax(axs[1, 1], param_name='sigma_v',
-                  xrange=[0.211, 6.33], yrange=[0, 5E-2],
+                  xrange=[0.211, 6.33], yrange=[1E-3, 1E-1],
                   xlabel='$\\sigma$ / $\\mathrm{km} \\mathrm{s}^{-1}$', clip=clip)
+    axs[1, 1].set_yscale('log')
     axs[0, 1].set_yticks([])
     axs[1, 1].set_yticks([])
+
 
     clip = {SC_DICT['NM']: 0, SC_DICT['I']: 0, SC_DICT['TD']: 0, SC_DICT['HJ']: 0, SC_DICT['WJ']: 0}
     add_fig_to_ax(axs[0,2], param_name='a_init',
                   xrange=[1E0, 1E1], yrange=[0, 1],
-                  xlabel='$a_0$ / au', clip=clip)
+                  xlabel='', clip=clip)
     axs[0,2].set_xticks([])
     add_fig_to_ax(axs[1, 2], param_name='a_init',
-                  xrange=[1E0, 1E1], yrange=[0, 5E-2],
+                  xrange=[1E0, 1E1], yrange=[1E-3, 1E-1],
                   xlabel='$a_0$ / au', clip=clip)
+    axs[1, 2].set_yscale('log')
     axs[0, 2].set_yticks([])
     axs[1, 2].set_yticks([])
 
+
     # style figure
     axs[0,0].plot(np.nan, np.nan, linestyle='dotted', color='black', label='Analytic')
-    axs[0,0].set_ylabel('Outcome probability')
+    axs[0,0].set_ylabel('Probability $P_{\\mathrm{oc}}$')
     h, l = axs[0,0].get_legend_handles_labels()
-    fig.legend(h, l, ncols=6, bbox_to_anchor=(0.82, 1.03), frameon=True)
+
+    fig.legend(h, l, ncols=6, bbox_to_anchor=(0.72, 0.98), frameon=True)
     fig.tight_layout()
     plt.savefig('test_data/test_model_param_data/test_model_param_plot.pdf', format='pdf', bbox_inches="tight")
 
 if __name__ == '__main__':
-    # vary_m1()
+    # vary_density()
+    # vary_sigma()
     # vary_a_init()
     save_fig()

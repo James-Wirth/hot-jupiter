@@ -1,12 +1,20 @@
 import os
+
+import matplotlib
 import pandas as pd
+pd.options.mode.chained_assignment = None
 from joblib import Parallel, delayed
 from hjmodel.config import *
 from hjmodel import model_utils, rand_utils
 from hjmodel.cluster import Plummer, DynamicPlummer
 from tqdm import contrib
 import matplotlib.pyplot as plt
-import time
+import seaborn as sns
+
+def get_p_oc(x, y_rel, d):
+    Q = np.array([d/(x[i]*np.sqrt(x[i]**2-d**2)) if x[i] > d else 0 for i in range(len(x))])
+    Q_num = Q * y_rel
+    return np.nansum(Q_num)/np.nansum(Q)
 
 def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
                 r: float, cluster: DynamicPlummer, total_time: int) -> list:
@@ -64,7 +72,7 @@ def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
             if model_utils.is_analytic_valid(*args, sigma_v=local_sigma_v):
                 e += model_utils.de_HR(*args)
             else:
-                de, da = model_utils.de_SIM_rand_phase(*args)
+                de, da = model_utils.de_sim(*args)
                 e += de
                 a += da
 
@@ -143,7 +151,7 @@ def eval_system(local_n_tot: float, local_sigma_v: float,
             if model_utils.is_analytic_valid(*args, sigma_v=local_sigma_v):
                 e += model_utils.de_HR(*args)
             else:
-                de, da = model_utils.de_SIM_rand_phase(*args)
+                de, da = model_utils.de_sim(*args)
                 e += de
                 a += da
 
@@ -226,13 +234,14 @@ class HJModel:
         self.num_systems = num_systems
         print(f'Evaluating N = {self.num_systems} systems (for t = {self.time} Myr)')
 
+        # 47 Tuc
         plummer = DynamicPlummer(M0=(1.64E6, 0.9E6),
                                  rt=(86, 70),
                                  rh=(1.91, 4.96),
                                  N=(2E6, 1.85E6),
                                  total_time=12000)
-        r_vals = plummer.get_radial_distribution(n_samples=self.num_systems)
 
+        r_vals = plummer.get_radial_distribution(n_samples=self.num_systems)
         # sys args
         sys = rand_utils.get_random_system_params(n_samples=self.num_systems)
 
@@ -254,17 +263,49 @@ class HJModel:
         df.to_parquet(self.path, engine='pyarrow')
         self.df = df
 
-    def plot_outcomes(self):
-        for index, row in self.df.iterrows():
-            if row['stopping_condition'] != 1:
-                plt.scatter(np.log10(row['final_a']), -np.log10(1 - row['final_e']),
-                            color=COLOR_DICT[row['stopping_condition']][0], s=3)
-        plt.show()
+    def plot_outcomes(self, ax):
+        df_filt = self.df.loc[self.df['stopping_condition'].isin([1])==False]
+        df_filt['x'] = df_filt['final_a']
+        df_filt['y'] = 1/(1-df_filt['final_e'])
+
+        indexes = df_filt[(df_filt['stopping_condition'] == 0)].sample(frac=0.5).index
+        df_filt = df_filt.drop(indexes)
+        indexes = df_filt[df_filt['stopping_condition'] == 2].sample(frac=0.5).index
+        df_filt = df_filt.drop(indexes)
+
+        palette_copy = PALETTE.copy()
+        palette_copy[0] = 'lightgray'
+
+        cmap = matplotlib.colors.ListedColormap(list(palette_copy.values()))
+        df_filt.plot.scatter(x='x', y='y', ax=ax, color=cmap(df_filt['stopping_condition']), s=0.1)
+        for i in ['NM', 'TD', 'HJ', 'WJ']:
+             ax.scatter(np.nan, np.nan, color=palette_copy[SC_DICT[i]], s=10, label=i, rasterized=True)
+        ax.legend(frameon=True)
 
     def get_outcome_probabilities(self) -> dict[str, float]:
-        return {key: self.df.loc[self.df['stopping_condition'] == SC_DICT[key]].shape[0]/self.df.shape[0]
+        return {key: self.df.loc[(self.df['stopping_condition'] == SC_DICT[key])
+                                & (self.df['r'] <= 100)].shape[0]/self.df.shape[0]
                 for key in SC_DICT}
 
     def get_statistics_for_outcome(self, outcomes: list[str], feature: str) -> list[float]:
-        return self.df.loc[self.df['stopping_condition'].isin(SC_DICT[x] for x in outcomes)][feature].to_list()
+        return self.df.loc[(self.df['stopping_condition'].isin(SC_DICT[x] for x in outcomes))
+                           & (self.df['r'] <= 100)][feature].to_list()
 
+    def get_projected_distribution(self):
+        self.df['stoc_r_proj'] = self.df['r'].apply(lambda r: r * np.sin(rand_utils.rand_i()))
+
+    def get_radius_histogram(self, label='stoc_r_proj', num_bins=60):
+        bins = np.geomspace(0.99*self.df[label].min(), 1.01*self.df[label].max(), num_bins)
+        self.df['binned'] = pd.cut(self.df[label], bins)
+        is_multi = self.df["binned"].value_counts() > 1500
+        filtered = self.df.loc[self.df["binned"].isin(is_multi[is_multi].index)].reset_index(drop=True)
+        ret = filtered.groupby(['binned'])['stopping_condition'].value_counts(normalize=True)
+        return ret, filtered['binned'].min().left, filtered['binned'].max().left
+
+    def get_a_init_histogram(self, label='a_init', num_bins=30):
+        bins = np.geomspace(1, 30, num_bins)
+        self.df['a_init_binned'] = pd.cut(self.df[label], bins)
+        is_multi = self.df["a_init_binned"].value_counts() > 1000
+        filtered = self.df.loc[self.df["a_init_binned"].isin(is_multi[is_multi].index)].reset_index(drop=True)
+        ret = filtered.groupby(['a_init_binned'])['stopping_condition'].value_counts(normalize=True)
+        return ret, filtered['a_init_binned'].min().left, filtered['a_init_binned'].max().left

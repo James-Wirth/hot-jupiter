@@ -4,11 +4,11 @@ from joblib import delayed, Parallel
 from hjmodel.config import *
 from scipy.optimize import fsolve
 
-def rand_b() -> float:
+def rand_b(override_b_max=B_MAX) -> float:
     """
     b: float            Random impact parameter (au)
     """
-    return np.sqrt(random.random() * B_MAX ** 2)
+    return np.sqrt(random.random() * override_b_max ** 2)
 
 def rand_v_infty(sigma_v: float) -> float:
     """
@@ -50,7 +50,7 @@ def rand_m3() -> float:
     else:
         return ((M_BR ** -1.8) + (1.8 / b) * (y_crit - y)) ** (-1 / 1.8)
 
-def random_encounter_params(sigma_v: float) -> dict[str, float]:
+def random_encounter_params(sigma_v: float, override_b_max=B_MAX) -> dict[str, float]:
     """
     Inputs
     ----------
@@ -63,7 +63,7 @@ def random_encounter_params(sigma_v: float) -> dict[str, float]:
     """
     d = {
         'v_infty':  rand_v_infty(sigma_v=sigma_v),
-        'b':        rand_b(),
+        'b':        rand_b(override_b_max=override_b_max),
         'Omega':    rand_2pi(),
         'inc':      rand_i(),
         'omega':    rand_2pi(),
