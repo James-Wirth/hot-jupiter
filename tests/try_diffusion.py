@@ -61,13 +61,11 @@ def plot_diffusion(b_vals):
         f'{b_vals[i]}': get_analytic(b_vals[i], total_time=4000) for i in range(len(b_vals))
     }
     df_sz_analytic = pd.DataFrame(d_analytic).melt().rename(columns={"value": "p", "variable": "$b_{max}$"})
-
     fig, ax = plt.subplots(figsize=(4, 4))
     g = sns.histplot(data=df_sz, x='e', hue='$b_{max}$', ax=ax, element='step', fill=False,
                      common_norm=False, bins=100, binrange=(0, 1), stat='density')
 
     h = sns.lineplot(data=df_sz_analytic, x=np.tile(e,len(b_vals)), y='p', hue='$b_{max}$', ax=ax)
-
     ax.set_xlim(0, 0.995)
     ax.set_ylim(1E-2, 10**1.6)
     ax.set_yscale('log')

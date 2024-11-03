@@ -32,7 +32,7 @@ def eval_system(num_perts):
             return i
     return np.nan
 
-def try_diffusion(n_tot, num_systems, total_time):
+def evaluate_density(n_tot, num_systems, total_time):
     num_perts = int(total_time * model_utils.get_perts_per_Myr(n_tot, CANON['sigma_v']))
     results = Parallel(n_jobs=NUM_CPUS)(
         delayed(eval_system)(num_perts) for _ in tqdm.tqdm(range(num_systems))
@@ -40,7 +40,7 @@ def try_diffusion(n_tot, num_systems, total_time):
     return results / model_utils.get_perts_per_Myr(n_tot, CANON['sigma_v'])
 
 def run_diffusion(n_tots):
-    d = {n_tot: try_diffusion(n_tot=n_tot, num_systems=200, total_time=10000) for n_tot in n_tots}
+    d = {n_tot: evaluate_density(n_tot=n_tot, num_systems=200, total_time=10000) for n_tot in n_tots}
     df = pd.DataFrame(data=d)
     df.to_parquet('test_data/try_diffusion_data/try_ionisation.pq', engine='pyarrow')
 
@@ -55,7 +55,5 @@ def plot_diffusion(n_tots):
 
 if __name__ == '__main__':
     n_tots = np.geomspace(5E-3, 5E-2, 3)
-    # n_tots = np.geomspace(1E-5, 1E-2, 7)
-    print(n_tots)
     run_diffusion(n_tots)
     plot_diffusion(n_tots)

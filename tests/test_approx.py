@@ -27,10 +27,8 @@ def eval_pert(sigma_v: float, e: float, a: float, m1: float, m2: float):
     }
     tidal_param = model_utils.tidal_param(*(args[x] for x in ['v_infty', 'b', 'a_init', 'm1', 'm2']))
     slow_param = model_utils.slow_param(*(args[x] for x in ['v_infty', 'b', 'a_init', 'm1', 'm2']))
-
     de_sim = np.abs(model_utils.de_sim(*args.values())[0])
     de_hr = np.abs(model_utils.de_HR(*args.values()))
-
     err = np.abs(de_sim - de_hr) / de_hr
     is_ionising = (e + de_sim >= 1) or (e + de_hr >= 1)
 
@@ -77,7 +75,6 @@ def test_approx(sigma_v=1.266, num_systems=100000):
     axs[0].set_ylim(0, max_s)
     axs[0].legend(frameon=True)
     axs[0].set_facecolor('lightgray')
-
     axs[0].axvline(x=15, ymin=300/1000, linestyle='dashed', color='black')
     axs[0].axhline(y=300, xmin=15/60, linestyle='dashed', color='black')
     axs[0].annotate('$\\mathcal{D}$', xy=(20, 400), textcoords='data', fontsize=14)

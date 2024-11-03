@@ -1,5 +1,4 @@
 import os
-import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from hjmodel.config import *
@@ -10,8 +9,11 @@ import hjmodel.model_utils
 import scienceplots
 plt.style.use(['science','nature'])
 
+def mean_de_sim(*args):
+    return np.mean([hjmodel.model_utils.de_sim(*args)[0] for _ in range(100)])
+
 def eval_pert(*args):
-    return [hjmodel.model_utils.de_sim(*args)[0],
+    return [mean_de_sim(*args),
             hjmodel.model_utils.de_HR(*args)]
 
 def eval_hybrid_params(*args):
@@ -20,7 +22,7 @@ def eval_hybrid_params(*args):
 
 def get_v_infty_dependence():
     args = {
-        'b': 30,
+        'b': 50,
         'Omega': 1,
         'inc': 1,
         'omega': 1,
@@ -30,7 +32,7 @@ def get_v_infty_dependence():
         'm2': 1E-3,
         'm3': 1
     }
-    v_infty_values = np.geomspace(1E-1, 1E2, 10000)
+    v_infty_values = np.geomspace(1E-1, 1E3, 1000)
     pert_results = np.array(Parallel(n_jobs=NUM_CPUS)(
         delayed(eval_pert)(v_infty, *args.values()) for v_infty in tqdm.tqdm(v_infty_values)
     )).T
@@ -60,52 +62,49 @@ def ax_config(ax, xrange, yrange, xlabel, ylabel, ax_type=None):
     if ylabel is not None:
         ax.set_ylabel(ylabel)
 
-def test_v_infty_dependence():
+def try_v_infty_dependence():
     path = 'test_data/test_v_infty_dependence_data/test_v_infty_dependence.pq'
     if not os.path.exists(path):
         get_v_infty_dependence()
-    df = pd.read_parquet(path, engine='pyarrow')
+    df = pd.read_parquet(path, engine='pyarrow').sort_values(by='v_infty')
 
     fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, gridspec_kw={'height_ratios': [1, 0.6]})
     fig.subplots_adjust(hspace=0.1)
 
-    # excitation against v_infty plot
-    # ax1.scatter(df['v_infty'], df['de_sim'],
-    #             label='$\\epsilon_{\\mathrm{sim}}$', s=1, color='xkcd:light grey')
-    ax1.plot(df['v_infty'], df['de_sim'].rolling(50, center=True).mean(),
-                label='$\\langle \\epsilon_{\\mathrm{sim}} \\rangle_{\\mathrm{\\phi}}$', color='xkcd:black', linestyle='solid')
-    ax1.plot(df['v_infty'], df['de_hr'],
-                label='$\\epsilon_{\\mathrm{hr}}$', color='xkcd:red')
-    ax1.axhline(0.7,
-                label='$\\epsilon_{\\mathrm{ion}}=1-e_0$', linestyle='dashed', color='green')
+    ax1.plot(df['v_infty'], df['de_sim'],
+                label='$\\langle \\epsilon_{\\mathrm{sim}} \\rangle_{\\mathrm{\\phi}}$', color='xkcd:black',
+                linestyle='solid', linewidth=0.75)
+    ax1.plot(df['v_infty'], df['de_hr'], label='$\\epsilon_{\\mathrm{hr}}$', color='xkcd:red')
+    ax1.axhline(0.7, label='$\\epsilon_{\\mathrm{ion}}=1-e_0$', linestyle='dashed', color='green')
     ax_config(ax1,
-              xrange=(1E-1, 1E2),
-              yrange=(1E-5, 1E2),
+              xrange=(10**(-1), 1E3),
+              yrange=(10**(-6.7), 20),
               xlabel=None,
               ylabel='Eccentricity excitation $|\\epsilon|$',
               ax_type='log')
-    ax1.legend(frameon=True)
+    ax1.legend(frameon=True, loc='upper right')
 
-    ax1.axvspan(1.4, 25, color="gray", alpha=0.1)
+    ax1.axvspan(1E-1, 0.73, color="gray", alpha=0.1)
+    ax1.axvspan(46, 1E3, color="gray", alpha=0.1)
 
     # T and S against v_infty plot
     ln2 = ax2.plot(df['v_infty'], df['tidal_param']/15,
-             label='$T/T_{\\mathrm{min}}$', linestyle=(0, (5, 1)), color='xkcd:eggplant purple')
+             label='$T/T_{\\mathrm{min}}$', linestyle=(0, (5, 1)), color='xkcd:black')
     ln3 = ax2.plot(df['v_infty'], df['slow_param']/300,
-             label='$S/S_{\\mathrm{min}}$', linestyle=(0, (1, 1)), color='xkcd:eggplant purple')
-    ax2.axvspan(1.4, 25, color="gray", alpha=0.1)
-    # ax2.axhline(y=1, color='green')
-    ax2.annotate("", (1.4, 0.3), (25, 0.3), arrowprops={'arrowstyle': '<->'})
-    ax2.annotate('$\\mathcal{D}$', xy=(5, 0.4), textcoords='data', fontsize=14, color='black')
-    ax_config(ax2, xrange=(1E-1, 1E2),
-              yrange=(1E-1, 14),
+             label='$S/S_{\\mathrm{min}}$', linestyle=(0, (1, 1)), color='xkcd:black')
+    ax2.axvspan(1E-1, 0.73, color="gray", alpha=0.1)
+    ax2.axvspan(46, 1E3, color="gray", alpha=0.1)
+    ax2.annotate("", (0.73, 0.3), (46, 0.3), arrowprops={'arrowstyle': '<->'}, color='xkcd:dark grey')
+    ax2.annotate('$\\mathcal{D}$', xy=(5, 0.4), textcoords='data', fontsize=14, color='xkcd:dark grey')
+    ax_config(ax2, xrange=(10**(-1), 1E3),
+              yrange=(1E-1, 30),
               xlabel='$v_{\\infty}$ / $\\mathrm{au} \\ \\mathrm{yr}^{-1}$',
               ylabel=None, ax_type='log')
-    ax2.legend(frameon=True)
+    ax2.legend(frameon=True, loc='upper right')
 
-    fig.set_size_inches(4, 4)
+    fig.set_size_inches(4, 3)
     fig.tight_layout()
     fig.savefig('test_data/test_v_infty_dependence_data/test_v_infty_dependence.pdf', format='pdf')
 
-def test_x():
-    get_v_infty_dependence()
+if __name__ == '__main__':
+    try_v_infty_dependence()

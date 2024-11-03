@@ -1,9 +1,8 @@
 import numpy as np
-import multiprocessing
 
 # model constants
 G = 4 * np.pi ** 2
-INIT_PHASES = 500
+INIT_PHASES = 5000
 XI = 1E-4
 
 # hybrid model critical parameters

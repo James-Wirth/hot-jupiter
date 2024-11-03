@@ -1,8 +1,6 @@
 from hjmodel.cluster import DynamicPlummer
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib
-
 import scienceplots
 plt.style.use(['science', 'nature'])
 

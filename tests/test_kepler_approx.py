@@ -10,5 +10,4 @@ def test_kepler_approx():
 
     plt.plot(e, model_vals)
     plt.plot(e, approx_vals)
-
     plt.show()

@@ -1,4 +1,3 @@
-from joblib import Parallel, delayed
 from hjmodel.config import *
 import numpy as np
 import rebound
