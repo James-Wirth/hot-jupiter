@@ -37,14 +37,18 @@ class DynamicPlummer:
     def isotropic_velocity_dispersion(self, r: float, t: float) -> float:
         return np.sqrt(G * self.itrp(self.M0, t) / (6 * np.sqrt((r * AU_PER_PSC) ** 2 + (self.itrp(self.a(self.rh), t) * AU_PER_PSC) ** 2)))
 
+    def env_vars(self, *args) -> dict[str, float]:
+        return {'n_tot': self.number_density(*args), 'sigma_v': self.isotropic_velocity_dispersion(*args)}
+
+
     def mass_enclosed(self, r: float, t: float) -> float:
         mass_integrand = lambda _r: 4 * np.pi * _r ** 2 * self.density(_r, t)
         return integrate.quad(mass_integrand, 0, r)[0]
     
     # at time zero
     def get_radial_distribution(self, n_samples:int) -> list:
-        cdf = lambda r: (r / self.interp_a(0)) ** 3 / (1 + (r / self.itrp(self.a(self.rh, 0))) ** 2) ** (3 / 2)
+        cdf = lambda r: (r / self.itrp(self.a(self.rh), 0)) ** 3 / (1 + (r / self.itrp(self.a(self.rh), 0)) ** 2) ** (3 / 2)
         inverse_cdf = lambda y: fsolve(lambda r: cdf(r) - y, self.itrp(self.rh, 0))[0]
-        y_cutoff = cdf(r=self.interp_rt(0))
+        y_cutoff = cdf(r=self.itrp(self.rt, 0))
         return Parallel(n_jobs=NUM_CPUS)(delayed(inverse_cdf)(y)
                                          for y in np.linspace(0, y_cutoff, n_samples+1)[1:])

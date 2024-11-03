@@ -92,12 +92,22 @@ def eval_system(local_n_tot: float, local_sigma_v: float,
 
         # apply stochastic kick
         if stopping_condition == SC_DICT['NM'] and enough_time_for_next_pert and e >= 0:
-            args = (rand_params['v_infty'], rand_params['b'], rand_params['Omega'], rand_params['inc'],
-                    rand_params['omega'], e, a, m1, m2, rand_params['m3'])
-            if model_utils.is_analytic_valid(*args, sigma_v=local_sigma_v):
-                e += model_utils.de_HR(*args)
+            args = {
+                'v_infty':      rand_params['v_infty'],
+                'b':            rand_params['b'],
+                'Omega':        rand_params['Omega'],
+                'inc':          rand_params['inc'],
+                'omega':        rand_params['omega'],
+                'e_init':       e,
+                'a_init':       a,
+                'm1':           m1,
+                'm2':           m2,
+                'm3':           rand_params['m3']
+            }
+            if model_utils.is_analytic_valid(*[args[x] for x in args], sigma_v=local_sigma_v):
+                e += model_utils.de_HR(*[args[x] for x in args])
             else:
-                de, da = model_utils.de_sim(*args)
+                de, da = model_utils.de_sim(*[args[x] for x in args])
                 e += de
                 a += da
 

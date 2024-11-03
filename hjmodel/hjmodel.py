@@ -1,10 +1,7 @@
 import os
-
 import matplotlib
 import pandas as pd
 from matplotlib.gridspec import GridSpec
-
-pd.options.mode.chained_assignment = None
 from joblib import Parallel, delayed
 from hjmodel.config import *
 from hjmodel import model_utils, rand_utils
@@ -12,6 +9,8 @@ from hjmodel.cluster import DynamicPlummer
 from tqdm import contrib
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+pd.options.mode.chained_assignment = None
 
 def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
                 r: float, cluster: DynamicPlummer, total_time: int) -> list:
@@ -36,22 +35,18 @@ def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
     : list
     """
 
+    # critical radii
     R_td, R_hj, R_wj = model_utils.get_critical_radii(m1=m1, m2=m2)
-
     # initialise running variables
-    e, a = e_init, a_init
-    current_time = stopping_time = 0
-    stopping_condition = SC_DICT['NM']
+    e, a, current_time = e_init, a_init, 0
+    stopping_condition, stopping_time = SC_DICT['NM'], 0
 
     while current_time < total_time:
-
-        # get environment vars from cluster object
-        local_n_tot = cluster.number_density(r, current_time)
-        local_sigma_v = cluster.isotropic_velocity_dispersion(r, current_time)
-        perts_per_Myr = model_utils.get_perts_per_Myr(local_n_tot=local_n_tot, local_sigma_v=local_sigma_v)
+        env_vars = cluster.env_vars(r, current_time)
+        perts_per_Myr = model_utils.get_perts_per_Myr(*env_vars.values())
 
         # get random encounter parameters and random wait time until the next stochastic kick
-        rand_params = rand_utils.random_encounter_params(sigma_v=local_sigma_v)
+        rand_params = rand_utils.random_encounter_params(sigma_v=env_vars['sigma_v'])
         wt_time = rand_utils.get_waiting_time(perts_per_Myr=perts_per_Myr)
 
         # check if there is sufficient time for the next stochastic kick
@@ -84,12 +79,22 @@ def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
 
         # apply stochastic kick
         if stopping_condition == SC_DICT['NM'] and enough_time_for_next_pert and e >= 0:
-            args = (rand_params['v_infty'], rand_params['b'], rand_params['Omega'], rand_params['inc'],
-                    rand_params['omega'], e, a, m1, m2, rand_params['m3'])
-            if model_utils.is_analytic_valid(*args, sigma_v=local_sigma_v):
-                e += model_utils.de_HR(*args)
+            args = {
+                'v_infty':      rand_params['v_infty'],
+                'b':            rand_params['b'],
+                'Omega':        rand_params['Omega'],
+                'inc':          rand_params['inc'],
+                'omega':        rand_params['omega'],
+                'e_init':       e,
+                'a_init':       a,
+                'm1':           m1,
+                'm2':           m2,
+                'm3':           rand_params['m3']
+            }
+            if model_utils.is_analytic_valid(*[args[x] for x in args], sigma_v=env_vars['sigma_v']):
+                e += model_utils.de_HR(*[args[x] for x in args])
             else:
-                de, da = model_utils.de_sim(*args)
+                de, da = model_utils.de_sim(*[args[x] for x in args])
                 e += de
                 a += da
 

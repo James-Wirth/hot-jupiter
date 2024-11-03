@@ -23,9 +23,19 @@ def eval_system(num_perts):
     a = CANON['a_init']
     for i in range(num_perts):
         rand_params = rand_utils.random_encounter_params(sigma_v=CANON['sigma_v'])
-        args = (rand_params['v_infty'], rand_params['b'], rand_params['Omega'], rand_params['inc'],
-                rand_params['omega'], e, a, CANON['m1'], CANON['m2'], rand_params['m3'])
-        de, da = model_utils.de_sim(*args)
+        args = {
+            'v_infty':      rand_params['v_infty'],
+            'b':            rand_params['b'],
+            'Omega':        rand_params['Omega'],
+            'inc':          rand_params['inc'],
+            'omega':        rand_params['omega'],
+            'e_init':       e,
+            'a_init':       a,
+            'm1':           CANON['m1'],
+            'm2':           CANON['m2'],
+            'm3':           rand_params['m3']
+        }
+        de, da = model_utils.de_sim(*[args[x] for x in args])
         e += de
         a += da
         if e > 1:

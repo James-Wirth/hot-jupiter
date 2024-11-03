@@ -7,7 +7,7 @@ plt.style.use(['science','nature'])
 
 def main():
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    cluster_name = '47tuc'
+    cluster_name = '47tuc_new'
     res_path = os.path.join(dir_path, 'data', f'exp_data_{cluster_name}.pq')
 
     # load a time-dependent Plummer profile instance with
