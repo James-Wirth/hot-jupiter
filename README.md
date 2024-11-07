@@ -12,9 +12,10 @@ No Migration | None of the above |
 
 ## Usage
 
-Create a `DynamicPlummer` instance with the values of the cluster parameters $M_0$ (total mass), $r_t$ (tidal radius), $r_h$ (half-mass radius), $N$ (number of stars and binaries) evaluated at $t=0$ and $t=$`total_time`. For 47 Tuc (c.f. Giersz and Heggie, 2011) evolved for 12 Gyr:
+Create a cluster instance. We have provided a `DynamicPlummer` class with parameters $M_0$ (total mass), $r_t$ (tidal radius), $r_h$ (half-mass radius), $N$ (number of stars and binaries) evaluated at $t=0$ and $t=$`total_time`. For 47 Tuc (c.f. Giersz and Heggie, 2011) evolved for 12 Gyr:
 
 ```python
+from hjmodel.cluster import DynamicPlummer
 plummer = DynamicPlummer(m0 = (1.64E6, 0.9E6),
                          rt = (86, 70),
                          rh = (1.91, 4.96),
@@ -22,9 +23,10 @@ plummer = DynamicPlummer(m0 = (1.64E6, 0.9E6),
                          total_time = 12000)
 ```
 
-Run the model:
+Create a `HJModel` instance and run the Monte-Carlo simulation:
 
 ```python
+from hjmodel import HJModel
 model = HJModel(res_path = RES_PATH)
 
 model.run_dynamic(time        = 12000,
