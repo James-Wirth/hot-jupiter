@@ -7,7 +7,7 @@ plt.style.use(['science','nature'])
 
 def main():
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    cluster_name = '47tuc_new'
+    cluster_name = '47tuc'
     res_path = os.path.join(dir_path, 'data', f'exp_data_{cluster_name}.pq')
 
     # load a time-dependent Plummer profile instance with
@@ -21,7 +21,7 @@ def main():
     model = HJModel(res_path=res_path)
 
     # run model for 12 Gyr, with 5E5 Monte-Carlo systems
-    model.run_dynamic(time=12000, num_systems=500000, cluster=plummer)
+    # model.run_dynamic(time=12000, num_systems=500000, cluster=plummer)
 
     # summary figures
     fig = model.get_summary_figure()

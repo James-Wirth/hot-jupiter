@@ -122,6 +122,7 @@ class HJModel:
     def __init__(self, res_path: str):
         self.time = self.num_systems = 0
         self.path = res_path
+        print(self.path)
         if os.path.exists(self.path):
             self.df = pd.read_parquet(self.path, engine='pyarrow')
         else:
@@ -220,16 +221,16 @@ class HJModel:
         ax3 = fig.add_subplot(gs[1, :])
 
         sns.histplot(data=self.df, x='r', hue='stopping_condition', ax=ax1, palette=PALETTE,
-                     element='step', fill=False, common_norm=True, stat='density', cumulative=True, log_scale=True,
+                     element='step', fill=False, common_norm=False, stat='density', cumulative=True, log_scale=True,
                      bins=200)
-        self.ax_config(ax=ax1, xrange=(0.1, 20), yrange=(1E-5, 1), xlabel='r / pc', ylabel='CDF')
+        self.ax_config(ax=ax1, xrange=(10**(-1.5), 20), yrange=(1E-4, 1), xlabel='r / pc', ylabel='CDF')
 
         df_filt = self.df.loc[self.df['stopping_condition'].isin([SC_DICT[outcome] for outcome in ['I', 'TD', 'HJ']])]
         df_filt['stopping_time_Gyr'] = df_filt['stopping_time'] / 1E3
         sns.histplot(data=df_filt, x='stopping_time_Gyr', hue='stopping_condition', ax=ax2, palette=PALETTE,
-                     element='step', fill=False, common_norm=True, stat='density', cumulative=True, log_scale=True,
+                     element='step', fill=False, common_norm=False, stat='density', cumulative=True, log_scale=True,
                      bins=400)
-        self.ax_config(ax=ax2, xrange=(1E-3, 11.99), yrange=(1E-5, 1), xlabel='$T_{\\mathrm{stop}}$ / Gyr', ylabel='CDF')
+        self.ax_config(ax=ax2, xrange=(1E-3, 11.99), yrange=(1E-4, 1), xlabel='$T_{\\mathrm{stop}}$ / Gyr', ylabel='CDF')
 
         self.plot_outcomes(ax3)
         self.ax_config(ax=ax3, xrange=(1E-2, 1E3), yrange=(1, 1E5), xlabel='$a$', ylabel='$1/(1-e)$')
