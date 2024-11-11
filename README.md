@@ -1,5 +1,8 @@
 # 🌌 HotJupiter
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+
 **HotJupiter** is a Monte-Carlo model for studying planet formation in dense globular clusters, with a focus on high-eccentricity migration. Utilizing the N-body [REBOUND](https://github.com/hannorein/rebound) code, HotJupiter simulates the dynamical evolution of planetary systems under the influence of stellar perturbations.
 
 Through these simulations, the final states of planetary systems are categorized into five unique outcomes:
