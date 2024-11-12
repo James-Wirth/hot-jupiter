@@ -14,9 +14,11 @@ Through these simulations, the final states of planetary systems are categorized
 
 ## 📦 Installation
 
-To get started with HotJupiter, you need to install the required dependencies and ensure REBOUND is properly set up.
+To get started with HotJupiter, clone the repository and install the dependencies:
 
 ```bash
+git clone https://github.com/James-Wirth/HotJupiter
+cd HotJupiter
 pip install -r requirements.txt
 ```
 
