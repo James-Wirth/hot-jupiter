@@ -88,8 +88,3 @@ fig2 = model.get_projected_probability_figure()
 ```
 
 ## License
-
-![DALL·E 2024-11-12 02 12 31 - A highly modern and minimalistic logo for a project titled 'HotJupiter,' with the words 'HotJupiter' centered in a sleek, simple, and contemporary fon copy](https://github.com/user-attachments/assets/497301c9-b105-4634-a796-d4d52195fdda)
-
-
-
