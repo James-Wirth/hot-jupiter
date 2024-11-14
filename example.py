@@ -7,7 +7,7 @@ plt.style.use(['science','nature'])
 
 def main():
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    cluster_name = '47tuc'
+    cluster_name = '47tuc_test'
     res_path = os.path.join(dir_path, 'data', f'exp_data_{cluster_name}.pq')
 
     # load a time-dependent Plummer profile instance with
@@ -21,7 +21,10 @@ def main():
     model = HJModel(res_path=res_path)
 
     # run model for 12 Gyr, with 5E5 Monte-Carlo systems
-    # model.run_dynamic(time=12000, num_systems=500000, cluster=plummer)
+    model.run_dynamic(time=12000, num_systems=4000, cluster=plummer)
+
+    # overall outcome probabilities
+    print(model.get_outcome_probabilities())
 
     # summary figures
     fig = model.get_summary_figure()
@@ -31,8 +34,6 @@ def main():
     fig = model.get_projected_probability_figure()
     plt.savefig(f'data/{cluster_name}_r_proj_override.pdf', format='pdf')
 
-    # overall outcome probabilities
-    print(model.get_outcome_probabilities())
 
 if __name__ == '__main__':
     main()

@@ -13,7 +13,7 @@ import seaborn as sns
 pd.options.mode.chained_assignment = None
 
 def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
-                r: float, cluster: DynamicPlummer, total_time: int) -> list:
+                        r: float, cluster: DynamicPlummer, total_time: int) -> list:
     """
     Calculates outcome for a given (randomised) system in the cluster
 
@@ -28,77 +28,70 @@ def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
 
     Returns
     ----------
-    [e,                         Final eccentricity                          arbitrary units
-    a,                          Final semi-major axis                       au
-    stopping_condition,         Stopping condition {NM, I, TD, HJ, WJ}      N/A
-    stopping_time]              Stopping time                               Myr
-    : list
+    [e, a, stopping_condition, stopping_time]: list
     """
 
-    # critical radii
+    # Get critical radii and initialize running variables
     R_td, R_hj, R_wj = model_utils.get_critical_radii(m1=m1, m2=m2)
-    # initialise running variables
-    e, a, current_time = e_init, a_init, 0
-    stopping_condition, stopping_time = SC_DICT['NM'], 0
+    e, a, current_time, stopping_time = e_init, a_init, 0, 0
+    stopping_condition = None
+
+    def check_stopping_conditions(e, a, current_time):
+        if e >= 1:
+            return SC_DICT['I']
+        if a * (1 - e) < R_td:
+            return SC_DICT['TD']
+        if a < R_hj and (e <= 1E-3 or current_time >= total_time):
+            return SC_DICT['HJ']
+        if R_hj < a < R_wj and (e <= 1E-3 or current_time >= total_time):
+            return SC_DICT['WJ']
+        if e <= 1E-3:
+            return SC_DICT['NM']
+        return None
 
     while current_time < total_time:
+
+        # check stopping conditions before tidal evolution
+        stopping_condition = check_stopping_conditions(e, a, current_time)
+        if stopping_condition is not None:
+            break
+
         env_vars = cluster.env_vars(r, current_time)
         perts_per_Myr = model_utils.get_perts_per_Myr(*env_vars.values())
-
-        # get random encounter parameters and random wait time until the next stochastic kick
-        rand_params = rand_utils.random_encounter_params(sigma_v=env_vars['sigma_v'])
         wt_time = rand_utils.get_waiting_time(perts_per_Myr=perts_per_Myr)
 
-        # check if there is sufficient time for the next stochastic kick
+        # tidal evolution
+        e, a = model_utils.tidal_effect(e=e, a=a, m1=m1, m2=m2, time_in_Myr=wt_time)
         current_time = min(current_time + wt_time, total_time)
-        enough_time_for_next_pert = current_time < total_time
 
-        # check stopping conditions
-        if e >= 1:
-            stopping_condition = SC_DICT['I']                         # ionisation
-            stopping_time = current_time - wt_time
+        # check stopping conditions after tidal evolution
+        stopping_condition = check_stopping_conditions(e, a, current_time)
+        if stopping_condition is not None:
             break
-        elif a * (1 - e) < R_td:
-            stopping_condition = SC_DICT['TD']                        # tidal disruption
-            stopping_time = current_time - wt_time
-            break
-        else:
-            # tidal evolution step
-            e, a = model_utils.tidal_effect(e=e, a=a, m1=m1, m2=m2, time_in_Myr=wt_time)
-            if a < R_hj and (not enough_time_for_next_pert or e <= 1E-3):    # hot Jupiter formation
-                stopping_condition = SC_DICT['HJ']
-                stopping_time = current_time
-                break
-            elif R_hj < a < R_wj and (not enough_time_for_next_pert or e <= 1E-3):  # warm Jupiter formation
-                stopping_condition = SC_DICT['WJ']
-                stopping_time = current_time
-                break
-            elif e <= 1E-3:
-                stopping_time = current_time                          # circularised but no migration
-                break
 
-        # apply stochastic kick
-        if stopping_condition == SC_DICT['NM'] and enough_time_for_next_pert and e >= 0:
+        if stopping_condition is None and current_time < total_time:
+            rand_params = rand_utils.random_encounter_params(sigma_v=env_vars['sigma_v'])
             args = {
-                'v_infty':      rand_params['v_infty'],
-                'b':            rand_params['b'],
-                'Omega':        rand_params['Omega'],
-                'inc':          rand_params['inc'],
-                'omega':        rand_params['omega'],
-                'e_init':       e,
-                'a_init':       a,
-                'm1':           m1,
-                'm2':           m2,
-                'm3':           rand_params['m3']
+                'v_infty': rand_params['v_infty'],
+                'b': rand_params['b'],
+                'Omega': rand_params['Omega'],
+                'inc': rand_params['inc'],
+                'omega': rand_params['omega'],
+                'e_init': e,
+                'a_init': a,
+                'm1': m1,
+                'm2': m2,
+                'm3': rand_params['m3']
             }
-            if model_utils.is_analytic_valid(*[args[x] for x in args], sigma_v=env_vars['sigma_v']):
-                e += model_utils.de_HR(*[args[x] for x in args])
+
+            if model_utils.is_analytic_valid(*args.values(), sigma_v=env_vars['sigma_v']):
+                e += model_utils.de_HR(*args.values())
             else:
-                de, da = model_utils.de_sim(*[args[x] for x in args])
+                de, da = model_utils.de_sim(*args.values())
                 e += de
                 a += da
 
-    return [e, a, stopping_condition, stopping_time]
+    return [e, a, stopping_condition if stopping_condition is not None else SC_DICT['NM'], current_time]
 
 class HJModel:
     """
