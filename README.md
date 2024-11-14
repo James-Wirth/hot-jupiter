@@ -1,4 +1,4 @@
-# 🌌 HotJupiter
+# HotJupiter
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
@@ -12,17 +12,19 @@ Through these simulations, the final states of planetary systems are categorized
 - **Warm Jupiter**: Systems with orbital periods $10 < T < 100 \ \mathrm{days}$
 - **No Migration**: Systems that do not fall into the above categories
 
-## 📦 Installation
+## Installation
 
-To get started with HotJupiter, you need to install the required dependencies and ensure REBOUND is properly set up.
+To get started with HotJupiter, clone the repository and install the dependencies:
 
 ```bash
+git clone https://github.com/James-Wirth/HotJupiter
+cd HotJupiter
 pip install -r requirements.txt
 ```
 
 ## Usage
 
-### 🚀 Quickstart
+### Quickstart
 
 The DynamicPlummer class initializes a simple time-interpolated Plummer model for a globular cluster with specified parameters. For example, for the 47 Tuc cluster (following Giersz & Heggie, 2011), we can set up a 12 Gyr-evolved instance as follows:
 
@@ -85,3 +87,4 @@ fig1 = model.get_summary_figure()
 fig2 = model.get_projected_probability_figure()
 ```
 
+## License
