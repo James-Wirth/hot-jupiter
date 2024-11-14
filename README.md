@@ -3,14 +3,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 
-**HotJupiter** is a Monte-Carlo model for studying planet formation in dense globular clusters, with a focus on high-eccentricity migration. Utilizing the N-body [REBOUND](https://github.com/hannorein/rebound) code, HotJupiter simulates the dynamical evolution of planetary systems under the influence of stellar perturbations.
+**HotJupiter** is a Monte-Carlo simulation package for studying Hot Jupiter formation in dense globular clusters via high-e migration. We have used the [REBOUND](https://github.com/hannorein/rebound) code with the IAS15 numerical integrator to simulate the dynamical evolution of planetary systems due to stellar perturbation.
 
-Through these simulations, the final states of planetary systems are categorized into five unique outcomes:
-- **Ionisation**: Unbound systems with $e > 1$
-- **Tidal Disruption**: Systems disrupted when $r(t) < R_{\mathrm{td}}$ at any time $t$
-- **Hot Jupiter**: Systems with orbital periods $T < 10 \ \mathrm{days}$
-- **Warm Jupiter**: Systems with orbital periods $10 < T < 100 \ \mathrm{days}$
-- **No Migration**: Systems that do not fall into the above categories
+The final states of planetary systems are categorized into five unique outcomes:
+
+| Category            | Description                                                     |
+|---------------------|-----------------------------------------------------------------|
+| **Ionisation**      | Unbound systems with $e > 1$                                   |
+| **Tidal Disruption**| Systems disrupted if $r(t) < R_{\mathrm{td}}$ at any time $t$  |
+| **Hot Jupiter**     | Systems with orbital periods $T < 10 \ \mathrm{days}$          |
+| **Warm Jupiter**    | Systems with orbital periods $10 < T < 100 \ \mathrm{days}$    |
+| **No Migration**    | Systems that do not fall into the above categories             |
+
 
 ## Installation
 
@@ -26,7 +30,7 @@ pip install -r requirements.txt
 
 ### Quickstart
 
-The DynamicPlummer class initializes a simple time-interpolated Plummer model for a globular cluster with specified parameters. For example, for the 47 Tuc cluster (following Giersz & Heggie, 2011), we can set up a 12 Gyr-evolved instance as follows:
+The DynamicPlummer class is a simple time-interpolated Plummer model for a globular cluster. For example, for the 47 Tuc cluster (following Giersz & Heggie, 2011), we can set up a 12 Gyr-evolved instance as follows:
 
 ```python
 from hjmodel.cluster import DynamicPlummer
@@ -42,7 +46,7 @@ plummer = DynamicPlummer(
 
 ### Run the Monte-Carlo simulation
 
-With the cluster instance created, you can now initialize an HJModel instance and run the Monte-Carlo simulation.
+With the cluster instance created, we can now initialize an HJModel instance and run the Monte-Carlo simulation.
 
 ```python
 from hjmodel import HJModel
