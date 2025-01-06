@@ -130,5 +130,5 @@ def get_analytic(b_max, total_time):
 
 if __name__ == '__main__':
     b_vals = [50, 75, 100]
-    run_diffusion(b_vals)
+    # run_diffusion(b_vals)
     plot_diffusion(b_vals)
