@@ -2,6 +2,8 @@ from hjmodel.config import *
 from joblib import delayed, Parallel
 from scipy import integrate
 from scipy.optimize import fsolve
+from functools import lru_cache
+from scipy.optimize import newton
 
 def interp(left: float, right: float, f: float) -> float:
     return left + (right - left) * f
@@ -21,13 +23,15 @@ class DynamicPlummer:
         self.total_time = total_time
         self.a = lambda _rh: tuple(x * (1/(0.5**(2/3)) - 1)**(1/2) for x in _rh)
 
+    @lru_cache(maxsize=None)
     def itrp(self, var, t):
         func = lambda left, right, f : left + (right - left) * f
         return func(var[0], var[1], t/self.total_time)
 
     # cluster methods
     def density(self, r: float, t: float) -> float:
-        return ((3 * self.itrp(self.M0, t)) / (4 * np.pi * self.itrp(self.a(self.rh), t) ** 3)) * (1 + r ** 2 / self.itrp(self.a(self.rh), t) ** 2) ** (-5 / 2)
+        a_rh = self.itrp(self.a(self.rh), t)
+        return ((3 * self.itrp(self.M0, t)) / (4 * np.pi * a_rh ** 3)) * (1 + r ** 2 / a_rh ** 2) ** (-5 / 2)
 
     # per 10^6 pc^3
     def number_density(self, r:float, t: float) -> float:
@@ -56,7 +60,20 @@ class DynamicPlummer:
         y_cutoff = cdf(r=self.itrp(self.rt, t))
         return np.linspace(0, y_cutoff, n_samples + 1)[1:]
 
-    def map_lagrange_to_radius(self, lagrange: float, t: float) -> float:
-        cdf = lambda r: (r / self.itrp(self.a(self.rh), t)) ** 3 / (1 + (r / self.itrp(self.a(self.rh), t)) ** 2) ** (3 / 2)
+    def map_lagrange_to_radius_old(self, lagrange: float, t: float) -> float:
+        cdf = lambda r: (r / self.itrp(self.a(self.rh), t)) ** 3 / (1 + (r / self.itrp(self.a(self.rh), t)) ** 2) ** (
+                    3 / 2)
         inverse_cdf = lambda y: fsolve(lambda r: cdf(r) - y, self.itrp(self.rh, t))[0]
         return inverse_cdf(lagrange)
+
+    def map_lagrange_to_radius(self, lagrange: float, t: float) -> float:
+        itrp_a_rh_t = self.itrp(self.a(self.rh), t)
+        itrp_rh_t = self.itrp(self.rh, t)
+        def cdf(r):
+            r_scaled = r / itrp_a_rh_t
+            return (r_scaled ** 3) / (1 + r_scaled ** 2) ** (3 / 2)
+        def inverse_cdf(y):
+            initial_guess = itrp_rh_t
+            return newton(lambda r: cdf(r) - y, initial_guess)
+        return inverse_cdf(lagrange)
+
