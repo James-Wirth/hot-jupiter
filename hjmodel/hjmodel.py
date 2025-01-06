@@ -13,7 +13,7 @@ import seaborn as sns
 pd.options.mode.chained_assignment = None
 
 def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
-                        r: float, cluster: DynamicPlummer, total_time: int) -> list:
+                        lagrange: float, cluster: DynamicPlummer, total_time: int) -> list:
     """
     Calculates outcome for a given (randomised) system in the cluster
 
@@ -56,6 +56,7 @@ def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
         if stopping_condition is not None:
             break
 
+        r = cluster.map_lagrange_to_radius(lagrange, current_time)
         env_vars = cluster.env_vars(r, current_time)
         perts_per_Myr = model_utils.get_perts_per_Myr(*env_vars.values())
         wt_time = rand_utils.get_waiting_time(perts_per_Myr=perts_per_Myr)
@@ -136,15 +137,19 @@ class HJModel:
         self.num_systems = num_systems
         print(f'Evaluating N = {self.num_systems} systems (for t = {self.time} Myr)')
 
-        r_vals = cluster.get_radial_distribution(n_samples=self.num_systems)
+        # r_vals = cluster.get_radial_distribution(n_samples=self.num_systems)
+        lagrange = cluster.get_lagrange_distribution(n_samples=self.num_systems, t=0)
         sys = rand_utils.get_random_system_params(n_samples=self.num_systems)   # sys args
 
         results = Parallel(n_jobs=NUM_CPUS)(
-            delayed(eval_system_dynamic)(*args, cluster, self.time) for args in contrib.tzip(*sys, r_vals)
+            delayed(eval_system_dynamic)(*args, cluster, self.time) for args in contrib.tzip(*sys, lagrange)
         )
 
+        map = np.vectorize(cluster.map_lagrange_to_radius)
+        present_r_vals = map(lagrange, t=time)
+
         d = {
-            'r': r_vals,
+            'r': present_r_vals,
             'final_e': [row[0] for row in results],
             'final_a': [row[1] for row in results],
             'stopping_condition': [row[2] for row in results],

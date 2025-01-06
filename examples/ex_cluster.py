@@ -1,3 +1,5 @@
+from matplotlib.animation import FuncAnimation
+
 from hjmodel.cluster import DynamicPlummer
 import numpy as np
 import matplotlib.pyplot as plt
@@ -42,3 +44,36 @@ def test_density_evolution():
 
     # plt.tight_layout()
     plt.savefig('test_data/test_cluster_data/test_density_evolution.pdf', format='pdf')
+
+def test_lagrange_radii():
+    plummer = DynamicPlummer(M0=(1.64E6, 0.9E6),
+                             rt=(86, 70),
+                             rh=(1.91, 4.96),
+                             N=(2E6, 1.85E6),
+                             total_time=12000)
+
+    n_samples = 1000
+    t_values = np.linspace(0, 12000, 200)  # 200 frames
+
+    d = plummer.get_lagrange_distribution(n_samples=1000, t=0)
+    map = np.vectorize(plummer.map_lagrange_to_radius)
+
+    fig, ax = plt.subplots()
+    histogram, edges, _ = ax.hist([], bins=200, color='blue', alpha=0.7)
+    ax.set_xlim(0, 200)
+    ax.set_xlabel("Radial Distance")
+    ax.set_ylabel("Frequency")
+    title = ax.set_title("Radial Distribution at t=0")
+
+    def update(frame):
+        t = t_values[frame]
+        data = map(d, t=t)
+        ax.clear()
+        ax.hist(data, bins=200, color='blue', alpha=0.7)
+        ax.set_xlim(0, 200)
+        ax.set_xlabel("Radial Distance")
+        ax.set_ylabel("Frequency")
+        ax.set_title(f"Radial Distribution at t={int(t)}")
+
+    anim = FuncAnimation(fig, update, frames=len(t_values), interval=100)
+    plt.show()

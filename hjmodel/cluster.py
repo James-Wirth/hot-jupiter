@@ -40,15 +40,23 @@ class DynamicPlummer:
     def env_vars(self, *args) -> dict[str, float]:
         return {'n_tot': self.number_density(*args), 'sigma_v': self.isotropic_velocity_dispersion(*args)}
 
-
     def mass_enclosed(self, r: float, t: float) -> float:
         mass_integrand = lambda _r: 4 * np.pi * _r ** 2 * self.density(_r, t)
         return integrate.quad(mass_integrand, 0, r)[0]
-    
-    # at time zero
-    def get_radial_distribution(self, n_samples:int) -> list:
-        cdf = lambda r: (r / self.itrp(self.a(self.rh), 0)) ** 3 / (1 + (r / self.itrp(self.a(self.rh), 0)) ** 2) ** (3 / 2)
-        inverse_cdf = lambda y: fsolve(lambda r: cdf(r) - y, self.itrp(self.rh, 0))[0]
-        y_cutoff = cdf(r=self.itrp(self.rt, 0))
+
+    def get_radial_distribution(self, n_samples:int, t: float) -> list:
+        cdf = lambda r: (r / self.itrp(self.a(self.rh), t)) ** 3 / (1 + (r / self.itrp(self.a(self.rh), t)) ** 2) ** (3 / 2)
+        inverse_cdf = lambda y: fsolve(lambda r: cdf(r) - y, self.itrp(self.rh, t))[0]
+        y_cutoff = cdf(r=self.itrp(self.rt, t))
         return Parallel(n_jobs=NUM_CPUS)(delayed(inverse_cdf)(y)
                                          for y in np.linspace(0, y_cutoff, n_samples+1)[1:])
+
+    def get_lagrange_distribution(self, n_samples: int, t: float) -> np.ndarray:
+        cdf = lambda r: (r / self.itrp(self.a(self.rh), t)) ** 3 / (1 + (r / self.itrp(self.a(self.rh), t)) ** 2) ** (3 / 2)
+        y_cutoff = cdf(r=self.itrp(self.rt, t))
+        return np.linspace(0, y_cutoff, n_samples + 1)[1:]
+
+    def map_lagrange_to_radius(self, lagrange: float, t: float) -> float:
+        cdf = lambda r: (r / self.itrp(self.a(self.rh), t)) ** 3 / (1 + (r / self.itrp(self.a(self.rh), t)) ** 2) ** (3 / 2)
+        inverse_cdf = lambda y: fsolve(lambda r: cdf(r) - y, self.itrp(self.rh, t))[0]
+        return inverse_cdf(lagrange)
