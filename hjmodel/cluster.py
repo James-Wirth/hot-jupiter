@@ -1,9 +1,14 @@
+from scipy.interpolate import interp1d
+
 from hjmodel.config import *
 from joblib import delayed, Parallel
 from scipy import integrate
 from scipy.optimize import fsolve
 from functools import lru_cache
 from scipy.optimize import newton
+
+from scipy.optimize import brentq
+from scipy.interpolate import RegularGridInterpolator
 
 def interp(left: float, right: float, f: float) -> float:
     return left + (right - left) * f
@@ -15,13 +20,21 @@ class DynamicPlummer:
     """
 
     def __init__(self, M0: (float, float), rt: (float, float), rh: (float, float), N: (float, float),
-                 total_time: int):
+                 total_time: int, t_grid_size=100, lagrange_grid_size=100):
         self.M0 = M0
         self.rt = rt
         self.rh = rh
         self.N = N
         self.total_time = total_time
         self.a = lambda _rh: tuple(x * (1/(0.5**(2/3)) - 1)**(1/2) for x in _rh)
+
+        # Precompute grid
+        self.t_grid = np.linspace(0, total_time, t_grid_size)
+        self.lagrange_grid = np.linspace(0, 1, lagrange_grid_size)
+        self.radius_grid = self._precompute_radius_grid()
+        self.radius_interpolator = RegularGridInterpolator(
+            (self.t_grid, self.lagrange_grid), self.radius_grid, bounds_error=False, fill_value=None
+        )
 
     @lru_cache(maxsize=None)
     def itrp(self, var, t):
@@ -77,3 +90,23 @@ class DynamicPlummer:
             return newton(lambda r: cdf(r) - y, initial_guess)
         return inverse_cdf(lagrange)
 
+    def _precompute_radius_grid(self):
+        radius_grid = np.zeros((len(self.t_grid), len(self.lagrange_grid)))
+
+        for i, t in enumerate(self.t_grid):
+            itrp_a_rh_t = self.itrp(self.a(self.rh), t)
+            itrp_rt_t = self.itrp(self.rt, t)
+
+            radii = np.linspace(0, itrp_rt_t, 500000)
+            cdf_values = (radii / itrp_a_rh_t) ** 3 / (1 + (radii / itrp_a_rh_t) ** 2) ** (3 / 2)
+            radius_interpolator = RegularGridInterpolator(
+                (cdf_values,), radii, bounds_error=False, fill_value=None
+            )
+
+            for j, lagrange in enumerate(self.lagrange_grid):
+                radius_grid[i, j] = radius_interpolator([lagrange])
+
+        return radius_grid
+
+    def map_lagrange_to_radius_precompute(self, lagrange, t):
+        return self.radius_interpolator((t, lagrange))
