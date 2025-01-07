@@ -6,7 +6,7 @@ from joblib import Parallel, delayed
 from hjmodel.config import *
 from hjmodel import model_utils, rand_utils
 from hjmodel.cluster import DynamicPlummer
-from tqdm import contrib
+from tqdm import contrib, tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -56,7 +56,7 @@ def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
         if stopping_condition is not None:
             break
 
-        r = cluster.map_lagrange_to_radius(lagrange, current_time)
+        r = cluster.map_lagrange_to_radius_precompute(lagrange, current_time)
         env_vars = cluster.env_vars(r, current_time)
         perts_per_Myr = model_utils.get_perts_per_Myr(*env_vars.values())
         wt_time = rand_utils.get_waiting_time(perts_per_Myr=perts_per_Myr)
@@ -145,9 +145,7 @@ class HJModel:
             delayed(eval_system_dynamic)(*args, cluster, self.time) for args in contrib.tzip(*sys, lagrange)
         )
 
-        map = np.vectorize(cluster.map_lagrange_to_radius)
-        present_r_vals = map(lagrange, t=time)
-
+        present_r_vals = np.vectorize(cluster.map_lagrange_to_radius)(lagrange, t=time)
         d = {
             'r': present_r_vals,
             'final_e': [row[0] for row in results],

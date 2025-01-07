@@ -56,7 +56,8 @@ def test_lagrange_radii():
     t_values = np.linspace(0, 12000, 200)  # 200 frames
 
     d = plummer.get_lagrange_distribution(n_samples=1000, t=0)
-    map = np.vectorize(plummer.map_lagrange_to_radius)
+    map = np.vectorize(plummer.map_lagrange_to_radius_precompute)
+    map_old = np.vectorize(plummer.map_lagrange_to_radius)
 
     fig, ax = plt.subplots()
     histogram, edges, _ = ax.hist([], bins=200, color='blue', alpha=0.7)
@@ -67,9 +68,11 @@ def test_lagrange_radii():
 
     def update(frame):
         t = t_values[frame]
+        data_old = map_old(d, t=t)
         data = map(d, t=t)
         ax.clear()
-        ax.hist(data, bins=200, color='blue', alpha=0.7)
+        ax.hist(data, bins=200, color='blue', alpha=0.7, density=True)
+        ax.hist(data_old, bins=200, color='red', alpha=0.7, density=True)
         ax.set_xlim(0, 200)
         ax.set_xlabel("Radial Distance")
         ax.set_ylabel("Frequency")
