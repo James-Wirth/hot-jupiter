@@ -56,7 +56,7 @@ def test_lagrange_radii():
     t_values = np.linspace(0, 12000, 200)  # 200 frames
 
     d = plummer.get_lagrange_distribution(n_samples=1000, t=0)
-    map = np.vectorize(plummer.map_lagrange_to_radius_precompute)
+    map = np.vectorize(plummer.map_lagrange_to_radius)
     map_old = np.vectorize(plummer.map_lagrange_to_radius)
 
     fig, ax = plt.subplots()
