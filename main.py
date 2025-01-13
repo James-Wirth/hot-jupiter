@@ -21,7 +21,7 @@ def main():
     model = HJModel(res_path=res_path)
 
     # run model for 12 Gyr, with 5E5 Monte-Carlo systems
-    model.run_dynamic(time=12000, num_systems=500000, cluster=plummer)
+    model.run_dynamic(time=12000, num_systems=50000, cluster=plummer)
 
     # overall outcome probabilities
     print(model.get_outcome_probabilities())

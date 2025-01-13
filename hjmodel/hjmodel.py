@@ -56,7 +56,7 @@ def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
         if stopping_condition is not None:
             break
 
-        r = cluster.map_lagrange_to_radius_precompute(lagrange, current_time)
+        r = cluster.map_lagrange_to_radius(lagrange, current_time)
         env_vars = cluster.env_vars(r, current_time)
         perts_per_Myr = model_utils.get_perts_per_Myr(*env_vars.values())
         wt_time = rand_utils.get_waiting_time(perts_per_Myr=perts_per_Myr)
