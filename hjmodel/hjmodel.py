@@ -1,14 +1,19 @@
 import os
+import shutil
+
 import matplotlib
 import pandas as pd
 from matplotlib.gridspec import GridSpec
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, cpu_count
 from hjmodel.config import *
 from hjmodel import model_utils, rand_utils
 from hjmodel.cluster import DynamicPlummer
 from tqdm import contrib, tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
+from pathlib import Path
+import dask.dataframe as dd
+import gc
 
 pd.options.mode.chained_assignment = None
 
@@ -128,37 +133,90 @@ class HJModel:
             ans = input('Invalid response. Please re-enter (Y/n): ')
         return ans.lower() in ['y', 'yes']
 
-    def run_dynamic(self, time: int, num_systems: int, cluster: DynamicPlummer):
+    def run_dynamic(self, time: int, num_systems: int, cluster: DynamicPlummer, num_batches: int = 250):
+        """
+        Executes a Monte Carlo simulation for planetary systems in a cluster environment.
+
+        Parameters
+        ----------
+        time : int
+            Total simulation time in Myr.
+        num_systems : int
+            Total number of systems to simulate.
+        cluster : DynamicPlummer
+            The cluster model used for environmental parameters.
+        num_batches : int, optional
+            Number of partitions to write to the Parquet file (default is 100).
+        """
         if self.df is not None:
             if not self.check_overwrite():
-                print('Run interrupted.')
+                print("Run interrupted.")
                 return
+
         self.time = time
         self.num_systems = num_systems
-        print(f'Evaluating N = {self.num_systems} systems (for t = {self.time} Myr)')
 
-        # r_vals = cluster.get_radial_distribution(n_samples=self.num_systems)
-        lagrange = cluster.get_lagrange_distribution(n_samples=self.num_systems, t=0)
-        sys = rand_utils.get_random_system_params(n_samples=self.num_systems)   # sys args
+        batch_size = num_systems // num_batches
+        print(f"Evaluating {self.num_systems} systems over {num_batches} partitions (t = {self.time} Myr)")
 
-        results = Parallel(n_jobs=NUM_CPUS)(
-            delayed(eval_system_dynamic)(*args, cluster, self.time) for args in contrib.tzip(*sys, lagrange)
-        )
+        output_dir = Path(self.path).parent / "parquet_batches"
+        if output_dir.exists():
+            print(f"Cleaning existing directory: {output_dir}")
+            shutil.rmtree(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        present_r_vals = np.vectorize(cluster.map_lagrange_to_radius)(lagrange, t=time)
-        d = {
-            'r': present_r_vals,
-            'final_e': [row[0] for row in results],
-            'final_a': [row[1] for row in results],
-            'stopping_condition': [row[2] for row in results],
-            'stopping_time': [row[3] for row in results],
-            'e_init': sys[0],
-            'a_init': sys[1],
-            'm1': sys[2]
-        }
-        df = pd.DataFrame(data=d)
-        df.to_parquet(self.path, engine='pyarrow')
-        self.df = df
+        # Precompute shared Lagrange distribution
+        lagrange = cluster.get_lagrange_distribution(n_samples=batch_size, t=0)
+
+        def process_and_write_partition(batch_idx: int):
+            """
+            Processes a single partition and writes it directly to a Parquet file.
+            """
+            print(f"Processing partition {batch_idx + 1}/{num_batches}")
+            sys = rand_utils.get_random_system_params(n_samples=batch_size)
+
+            # Parallel computation of system dynamics
+            results = Parallel(n_jobs=cpu_count() - 1, prefer="threads", batch_size="auto", require="sharedmem")(
+                delayed(eval_system_dynamic)(*args, cluster, self.time) for args in contrib.tzip(*sys, lagrange)
+            )
+
+            # Compute radii
+            present_r_vals = np.vectorize(cluster.map_lagrange_to_radius)(lagrange, t=time)
+
+            # Create DataFrame for the partition
+            partition_df = pd.DataFrame({
+                "r": present_r_vals,
+                "final_e": [row[0] for row in results],
+                "final_a": [row[1] for row in results],
+                "stopping_condition": [row[2] for row in results],
+                "stopping_time": [row[3] for row in results],
+                "e_init": sys[0],
+                "a_init": sys[1],
+                "m1": sys[2],
+            })
+
+            # Write partition directly to Parquet file
+            partition_path = output_dir / f"partition_{batch_idx + 1}.parquet"
+            partition_df.to_parquet(partition_path, engine="pyarrow", compression="snappy")
+
+        # Process and write all partitions
+        for i in range(num_batches):
+            process_and_write_partition(i)
+
+        print("All partitions processed. Combining results with Dask...")
+
+        # Combine all partitions using Dask
+        ddf = dd.read_parquet(str(output_dir / "*.parquet"))
+        print(f"Saving combined dataset to {self.path}")
+        ddf.to_parquet(self.path, engine="pyarrow", write_index=False)
+
+        # Optionally clean up individual partition files
+        for partition_file in output_dir.glob("partition_*.parquet"):
+            partition_file.unlink()
+        output_dir.rmdir()
+
+        # Load the combined dataset into memory
+        self.df = pd.read_parquet(self.path)
 
     def plot_outcomes(self, ax):
         df_filt = self.df.loc[self.df['stopping_condition'].isin([1])==False]
