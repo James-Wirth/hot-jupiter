@@ -18,7 +18,8 @@ import gc
 pd.options.mode.chained_assignment = None
 
 def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
-                        lagrange: float, cluster: DynamicPlummer, total_time: int) -> list:
+                        lagrange: float, cluster: DynamicPlummer, total_time: int,
+                        hybrid_switch: bool = True) -> list:
     """
     Calculates outcome for a given (randomised) system in the cluster
 
@@ -90,7 +91,7 @@ def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
                 'm3': rand_params['m3']
             }
 
-            if model_utils.is_analytic_valid(*args.values(), sigma_v=env_vars['sigma_v']):
+            if model_utils.is_analytic_valid(*args.values(), sigma_v=env_vars['sigma_v']) or not hybrid_switch:
                 e += model_utils.de_HR(*args.values())
             else:
                 de, da = model_utils.de_sim(*args.values())
@@ -133,7 +134,8 @@ class HJModel:
             ans = input('Invalid response. Please re-enter (Y/n): ')
         return ans.lower() in ['y', 'yes']
 
-    def run_dynamic(self, time: int, num_systems: int, cluster: DynamicPlummer, num_batches: int = 250):
+    def run_dynamic(self, time: int, num_systems: int, cluster: DynamicPlummer,
+                    num_batches: int = 250, hybrid_switch: bool = True):
         """
         Executes a Monte Carlo simulation for planetary systems in a cluster environment.
 
@@ -147,6 +149,8 @@ class HJModel:
             The cluster model used for environmental parameters.
         num_batches : int, optional
             Number of partitions to write to the Parquet file (default is 100).
+        hybrid_switch : bool, optional
+            Toggle hybrid model
         """
         if self.df is not None:
             if not self.check_overwrite():
@@ -177,7 +181,7 @@ class HJModel:
 
             # Parallel computation of system dynamics
             results = Parallel(n_jobs=cpu_count() - 1, prefer="threads", batch_size="auto", require="sharedmem")(
-                delayed(eval_system_dynamic)(*args, cluster, self.time) for args in contrib.tzip(*sys, lagrange)
+                delayed(eval_system_dynamic)(*args, cluster, self.time, hybrid_switch) for args in contrib.tzip(*sys, lagrange)
             )
 
             # Compute radii
@@ -309,3 +313,4 @@ class HJModel:
         fig.legend(loc='upper right', labels=list(SC_DICT.keys()), reverse=False, bbox_to_anchor=(0.86, 1.01),
                    ncols=5, frameon=True)
         return fig
+    
