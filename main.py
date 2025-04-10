@@ -1,8 +1,12 @@
 from hjmodel import HJModel
 import os
 import matplotlib.pyplot as plt
-from hjmodel.cluster import DynamicPlummer
+from hjmodel.fixed_cluster import Plummer
 import scienceplots
+
+import dask.dataframe as dd
+
+from pathlib import Path
 plt.style.use(['science','nature'])
 
 def main():
@@ -12,7 +16,7 @@ def main():
 
     # load a time-dependent Plummer profile instance with
     # cluster parameters defined as per Giersz and Heggie (2011)
-    plummer = DynamicPlummer(M0=(1.64E6, 0.9E6),
+    plummer = Plummer(M0=(1.64E6, 0.9E6),
                              rt=(86, 70),
                              rh=(1.91, 4.96),
                              N=(2E6, 1.85E6),
@@ -21,20 +25,10 @@ def main():
     model = HJModel(res_path=res_path)
 
     # run model for 12 Gyr, with 5E5 Monte-Carlo systems
-    model.run_dynamic(time=12000, num_systems=250000, cluster=plummer, hybrid_switch=False)
-
-    # overall outcome probabilities
-    print(model.get_outcome_probabilities())
-
-    # summary figures
-    fig = model.get_summary_figure()
-    plt.savefig(f'data/{cluster_name}_overall.pdf', format='pdf', dpi=1000)
-
-    # outcome probability against projected radius
-    fig = model.get_projected_probability_figure()
-    plt.savefig(f'data/{cluster_name}_r_proj_override.pdf', format='pdf')
+    model.run_dynamic(time=12000, num_systems=58000, cluster=plummer, hybrid_switch=False)
 
 
 if __name__ == '__main__':
     main()
+
 

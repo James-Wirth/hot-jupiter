@@ -1,3 +1,4 @@
+"""
 from scipy.interpolate import interp1d
 
 from hjmodel.config import *
@@ -14,29 +15,14 @@ def interp(left: float, right: float, f: float) -> float:
     return left + (right - left) * f
 
 class DynamicPlummer:
-    """
-    DynamicPlummer class
-    Calculates density and velocity dispersion profiles of globular clusters with given parameters
-    """
-
     def __init__(self, M0: (float, float), rt: (float, float), rh: (float, float), N: (float, float),
-                 total_time: int, t_grid_size=500, lagrange_grid_size=500):
+                 total_time: int):
         self.M0 = M0
         self.rt = rt
         self.rh = rh
         self.N = N
         self.total_time = total_time
         self.a = lambda _rh: tuple(x * (1/(0.5**(2/3)) - 1)**(1/2) for x in _rh)
-
-        """
-        # Precompute grid
-        self.t_grid = np.linspace(0, total_time, t_grid_size)
-        self.lagrange_grid = np.linspace(0, 1, lagrange_grid_size)
-        self.radius_grid = self._precompute_radius_grid()
-        self.radius_interpolator = RegularGridInterpolator(
-            (self.t_grid, self.lagrange_grid), self.radius_grid, bounds_error=False, fill_value=None
-        )
-        """
 
     @lru_cache(maxsize=None)
     def itrp(self, var, t):
@@ -73,15 +59,8 @@ class DynamicPlummer:
     def get_lagrange_distribution(self, n_samples: int, t: float) -> np.ndarray:
         cdf = lambda r: (r / self.itrp(self.a(self.rh), t)) ** 3 / (1 + (r / self.itrp(self.a(self.rh), t)) ** 2) ** (3 / 2)
         y_cutoff = cdf(r=self.itrp(self.rt, t))
-        return np.linspace(0, y_cutoff, n_samples + 1)[1:]
-
-    """
-    def map_lagrange_to_radius_old(self, lagrange: float, t: float) -> float:
-        cdf = lambda r: (r / self.itrp(self.a(self.rh), t)) ** 3 / (1 + (r / self.itrp(self.a(self.rh), t)) ** 2) ** (
-                    3 / 2)
-        inverse_cdf = lambda y: fsolve(lambda r: cdf(r) - y, self.itrp(self.rh, t))[0]
-        return inverse_cdf(lagrange)
-    """
+        # return np.linspace(0, y_cutoff, n_samples + 1)[1:]
+        return np.linspace(0, y_cutoff, n_samples + 1)[1:] - (y_cutoff / (2 * n_samples))
 
     def map_lagrange_to_radius(self, lagrange: float, t: float) -> float:
         itrp_a_rh_t = self.itrp(self.a(self.rh), t)
@@ -94,28 +73,4 @@ class DynamicPlummer:
             return newton(lambda r: cdf(r) - y, initial_guess)
         return inverse_cdf(lagrange)
 
-    """
-    def _precompute_radius_grid(self):
-        # Vectorized precomputation
-        radius_grid = np.zeros((len(self.t_grid), len(self.lagrange_grid)), dtype=np.float32)
-
-        for i, t in enumerate(self.t_grid):
-            itrp_a_rh_t = self.itrp(self.a(self.rh), t)
-            itrp_rt_t = self.itrp(self.rt, t)
-
-            radii = np.linspace(0, itrp_rt_t, 500000)
-            cdf_values = (radii / itrp_a_rh_t) ** 3 / (1 + (radii / itrp_a_rh_t) ** 2) ** (3 / 2)
-
-            # Precompute an interpolator for the current time step
-            radius_interpolator = interpolate.interp1d(
-                cdf_values, radii, kind='linear', bounds_error=False, fill_value=itrp_rt_t
-            )
-
-            # Apply the interpolator to the entire lagrange_grid
-            radius_grid[i, :] = radius_interpolator(self.lagrange_grid)
-
-        return radius_grid
-
-    def map_lagrange_to_radius_precompute(self, lagrange, t):
-        return self.radius_interpolator((t, lagrange))
-    """
+"""
