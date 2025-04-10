@@ -115,7 +115,7 @@ def try_v_infty_dependence():
               ylabel=None, x_ax_type='log', y_ax_type='log')
     ax2.legend(frameon=True, loc='upper right')
 
-    fig.set_size_inches(4, 3)
+    fig.set_size_inches(4, 4)
     fig.tight_layout()
     fig.savefig('test_data/test_v_infty_dependence_data/test_v_infty_dependence2.pdf', format='pdf')
 

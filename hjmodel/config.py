@@ -35,19 +35,19 @@ SC_DICT = {
 }
 
 COLOR_DICT = {
-    SC_DICT['NM']: ['gray', 'm'],
-    SC_DICT['I']: ['green', 'g'],
-    SC_DICT['TD']: ['blue', 'b'],
-    SC_DICT['HJ']: ['red', 'r'],
-    SC_DICT['WJ']: ['orange', 'o']
+    SC_DICT['NM']: ['#7F7F7F', 'm'],
+    SC_DICT['I']: ['#1b2a49', 'g'],
+    SC_DICT['TD']: ['#769EAA', 'b'],
+    SC_DICT['HJ']: ['#D62728', 'r'],
+    SC_DICT['WJ']: ['#FF7F0E', 'o']
 }
 
 PALETTE = {
-    0: 'gray',
-    1: 'green',
-    2: 'blue',
-    3: 'red',
-    4: 'orange'
+    0: '#7F7F7F',
+    1: '#1b2a49',
+    2: '#769EAA',
+    3: '#D62728',
+    4: '#FF7F0E'
 }
 
 NUM_CPUS = -1

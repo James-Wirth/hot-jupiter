@@ -7,7 +7,7 @@ from matplotlib.gridspec import GridSpec
 from joblib import Parallel, delayed, cpu_count
 from hjmodel.config import *
 from hjmodel import model_utils, rand_utils
-from hjmodel.cluster import DynamicPlummer
+from hjmodel.fixed_cluster import Plummer
 from tqdm import contrib, tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -15,10 +15,12 @@ from pathlib import Path
 import dask.dataframe as dd
 import gc
 
+import glob
+
 pd.options.mode.chained_assignment = None
 
 def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
-                        lagrange: float, cluster: DynamicPlummer, total_time: int,
+                        lagrange: float, cluster: Plummer, total_time: int,
                         hybrid_switch: bool = True) -> list:
     """
     Calculates outcome for a given (randomised) system in the cluster
@@ -123,10 +125,32 @@ class HJModel:
         self.time = self.num_systems = 0
         self.path = res_path
         print(self.path)
+
+        # Extract base stem from the given path
+        base_stem = res_path.replace(".pq", "").rsplit("_RUN", 1)[0]
+
+        # Find all matching files
+        file_pattern = f"{base_stem}_RUN*.pq"
+        matching_files = glob.glob(file_pattern)
+
+        # Also include the original file without _RUNX
+        if os.path.exists(res_path):
+            matching_files.append(res_path)
+
+        # Load and concatenate all found dataframes
+        self.df = None
+        if matching_files:
+            dataframes = [pd.read_parquet(f, engine='pyarrow') for f in matching_files]
+            self.df = pd.concat(dataframes, ignore_index=True)
+
+        print(self.df.shape[0])
+
+        """
         if os.path.exists(self.path):
             self.df = pd.read_parquet(self.path, engine='pyarrow')
         else:
             self.df = None
+        """
 
     def check_overwrite(self):
         ans = input(f'Data already exists at {self.path}.\nDo you want to overwrite? (Y/n): ')
@@ -134,7 +158,7 @@ class HJModel:
             ans = input('Invalid response. Please re-enter (Y/n): ')
         return ans.lower() in ['y', 'yes']
 
-    def run_dynamic(self, time: int, num_systems: int, cluster: DynamicPlummer,
+    def run_dynamic(self, time: int, num_systems: int, cluster: Plummer,
                     num_batches: int = 250, hybrid_switch: bool = True):
         """
         Executes a Monte Carlo simulation for planetary systems in a cluster environment.
@@ -190,10 +214,10 @@ class HJModel:
             # Create DataFrame for the partition
             partition_df = pd.DataFrame({
                 "r": present_r_vals,
-                "final_e": [row[0] for row in results],
-                "final_a": [row[1] for row in results],
-                "stopping_condition": [row[2] for row in results],
-                "stopping_time": [row[3] for row in results],
+                "final_e": np.array([row[0] for row in results], dtype=np.float32),
+                "final_a": np.array([row[1] for row in results], dtype=np.float32),
+                "stopping_condition": np.array([row[2] for row in results], dtype=np.int8),
+                "stopping_time": np.array([row[3] for row in results], dtype=np.float32),
                 "e_init": sys[0],
                 "a_init": sys[1],
                 "m1": sys[2],
@@ -202,6 +226,9 @@ class HJModel:
             # Write partition directly to Parquet file
             partition_path = output_dir / f"partition_{batch_idx + 1}.parquet"
             partition_df.to_parquet(partition_path, engine="pyarrow", compression="snappy")
+
+            del sys, results, partition_df, present_r_vals
+            gc.collect()  # Explicitly free memory
 
         # Process and write all partitions
         for i in range(num_batches):
@@ -221,6 +248,7 @@ class HJModel:
 
         # Load the combined dataset into memory
         self.df = pd.read_parquet(self.path)
+        gc.collect()
 
     def plot_outcomes(self, ax):
         df_filt = self.df.loc[self.df['stopping_condition'].isin([1])==False]
@@ -243,6 +271,11 @@ class HJModel:
                                 & (self.df['r'] <= 100)].shape[0]/self.df.shape[0]
                 for key in SC_DICT}
 
+    def get_outcome_probabilities_for_range(self, r_min, r_max):
+        filt = self.df.loc[(self.df['r'] >= r_min) & (self.df['r'] <= r_max)]
+        return {key: filt.loc[filt['stopping_condition'] == SC_DICT[key]].shape[0] / filt.shape[0]
+                for key in SC_DICT}
+
     def get_statistics_for_outcome(self, outcomes: list[str], feature: str) -> list[float]:
         return self.df.loc[(self.df['stopping_condition'].isin(SC_DICT[x] for x in outcomes))
                            & (self.df['r'] <= 100)][feature].to_list()
@@ -250,10 +283,10 @@ class HJModel:
     def get_projected_distribution(self):
         self.df['stoc_r_proj'] = self.df['r'].apply(lambda r: r * np.sin(rand_utils.rand_i()))
 
-    def get_radius_histogram(self, label='stoc_r_proj', num_bins=60):
+    def get_radius_histogram(self, label='stoc_r_proj', num_bins=100):
         bins = np.geomspace(0.99*self.df[label].min(), 1.01*self.df[label].max(), num_bins)
         self.df['binned'] = pd.cut(self.df[label], bins)
-        is_multi = self.df["binned"].value_counts() > 1500
+        is_multi = self.df["binned"].value_counts() > 1000
         filtered = self.df.loc[self.df["binned"].isin(is_multi[is_multi].index)].reset_index(drop=True)
         ret = filtered.groupby(['binned'])['stopping_condition'].value_counts(normalize=True)
         return ret, filtered['binned'].min().left, filtered['binned'].max().left
@@ -270,47 +303,68 @@ class HJModel:
         if rasterized:
             ax.collections[0].set_rasterized(True)
 
-    def get_summary_figure(self):
-        fig = plt.figure(layout='constrained')
-        fig.set_size_inches(4, 5)
-        gs = GridSpec(2, 2, figure=fig)
-        ax1 = fig.add_subplot(gs[0, 0])
-        ax2 = fig.add_subplot(gs[0, 1], sharey=ax1)
-        ax3 = fig.add_subplot(gs[1, :])
-
-        sns.histplot(data=self.df, x='r', hue='stopping_condition', ax=ax1, palette=PALETTE,
-                     element='step', fill=False, common_norm=False, stat='density', cumulative=True, log_scale=True,
-                     bins=200)
-        self.ax_config(ax=ax1, xrange=(10**(-1.5), 20), yrange=(1E-4, 1), xlabel='r / pc', ylabel='CDF')
-
+    def plot_stopping_time_cdf_fig(self, ax, xrange=None, yrange=None, xlabel=None, ylabel=None):
         df_filt = self.df.loc[self.df['stopping_condition'].isin([SC_DICT[outcome] for outcome in ['I', 'TD', 'HJ']])]
         df_filt['stopping_time_Gyr'] = df_filt['stopping_time'] / 1E3
-        sns.histplot(data=df_filt, x='stopping_time_Gyr', hue='stopping_condition', ax=ax2, palette=PALETTE,
-                     element='step', fill=False, common_norm=False, stat='density', cumulative=True, log_scale=True,
-                     bins=400)
-        self.ax_config(ax=ax2, xrange=(1E-3, 11.99), yrange=(1E-4, 1), xlabel='$T_{\\mathrm{stop}}$ / Gyr', ylabel='CDF')
+        bins = np.logspace(np.log10(1E-3), np.log10(11.99), 1000)
+        sns.histplot(data=df_filt, x='stopping_time_Gyr', hue='stopping_condition', ax=ax, palette=PALETTE,
+                     element='step', fill=False, common_norm=False, stat='density', cumulative=True,
+                     bins=bins)
+        self.ax_config(ax=ax, xrange=(1E-3, 11.99), yrange=(0.01, 1), xlabel='$T_{\\mathrm{stop}}$ / Gyr',
+                       ylabel='CDF', xscale='log', yscale='linear')
 
-        self.plot_outcomes(ax3)
-        self.ax_config(ax=ax3, xrange=(1E-2, 1E3), yrange=(1, 1E5), xlabel='$a$', ylabel='$1/(1-e)$')
-        points = ax3.collections[0]
+
+    def plot_sma_histogram_fig(self, ax):
+        conditions = ['NM', 'TD', 'WJ', 'HJ']
+        df_filt = self.df.loc[self.df['stopping_condition'].isin([SC_DICT[outcome] for outcome in conditions])]
+        df_filt = df_filt.drop(df_filt[(df_filt['stopping_condition'] == 0)].sample(frac=0.9).index)
+
+        palette_copy = PALETTE.copy()
+        palette_copy[0] = 'lightgray'
+
+        for condition in conditions:
+            df_condition = df_filt[df_filt['stopping_condition'] == SC_DICT[condition]]
+            sns.histplot(data=df_condition, y='final_a', ax=ax, color=palette_copy[SC_DICT[condition]], cumulative=True,
+                        stat='density', element='step', bins=np.logspace(np.log10(0.01), np.log10(1000), 200), fill=False, rasterized=True)
+
+        ax.set_yscale('log')
+        ax.set_ylim(0.01, 100)
+        ax.set_xlabel('Cumulative Density')
+
+        ax.set_yticks([])
+        ax.set_ylabel('')
+        ax.tick_params(left=False)
+
+    def plot_sma_fig(self, ax):
+        conditions = ['NM', 'TD', 'WJ', 'HJ']
+        df_filt = self.df.loc[self.df['stopping_condition'].isin([SC_DICT[outcome] for outcome in conditions])]
+        df_filt = df_filt.drop(df_filt[(df_filt['stopping_condition'] == 0)].sample(frac=0.9).index)
+
+        palette_copy = PALETTE.copy()
+        palette_copy[0] = 'lightgray'
+
+        # Plot each condition separately to control zorder
+        for idx, condition in enumerate(conditions):
+            df_condition = df_filt[df_filt['stopping_condition'] == SC_DICT[condition]]
+            sns.scatterplot(data=df_condition, x='r', y='final_a', label=condition, ax=ax,
+                            color=palette_copy[SC_DICT[condition]], zorder=idx, s=3, linewidth=0)
+
+        self.ax_config(ax=ax, xrange=(0.5, 20), yrange=(0.01, 100), xlabel='r / pc', ylabel='a / au')
+
+    def plot_phase_plane_fig(self, ax, xrange=None, yrange=None, xlabel=None, ylabel=None):
+        self.plot_outcomes(ax)
+        self.ax_config(ax=ax, xrange=(1E-2, 1E3), yrange=(1, 1E5), xlabel='$a$', ylabel='$1/(1-e)$')
+        points = ax.collections[0]
         points.set_rasterized(True)
-        fig.legend(loc='upper right', labels=list(SC_DICT.keys())[::-1], reverse=True, bbox_to_anchor=(0.9, 1.05),
-                   ncols=5, frameon=True)
-        return fig
 
-    def get_projected_probability_figure(self):
+    def plot_projected_probability_fig(self, ax, linestyle="solid", xrange=None, yrange=None, xlabel=None, ylabel=None):
         self.get_projected_distribution()
-        fig, ax = plt.subplots(nrows=1, ncols=1)
-        fig.set_size_inches(4, 2.5)
         res, llim, rlim = self.get_radius_histogram()
         res = res.reset_index()
+        print(res)
         res['binned'] = res['binned'].apply(lambda x: x.left)
         for key, grp in res.groupby(['stopping_condition']):
-            print(grp)
-            ax.step(grp['binned'], grp['proportion'], color=PALETTE[key[0]], label=list(SC_DICT.keys())[key[0]])
+            ax.step(grp['binned'], grp['proportion'], color=PALETTE[key[0]], label=list(SC_DICT.keys())[key[0]], linestyle=linestyle)
         self.ax_config(ax=ax, xrange=(llim, rlim), yrange=(1E-4, 1),
-                  xlabel='Projected $r_{\\perp}$ / pc', ylabel='Probability $P_{\\mathrm{oc}}$')
-        fig.legend(loc='upper right', labels=list(SC_DICT.keys()), reverse=False, bbox_to_anchor=(0.86, 1.01),
-                   ncols=5, frameon=True)
-        return fig
-    
+                       xlabel='Projected $r_{\\perp}$ / pc', ylabel='Probability $P_{\\mathrm{oc}}$')
+

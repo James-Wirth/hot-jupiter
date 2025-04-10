@@ -22,3 +22,8 @@ def test_a():
 
     # a_lin = np.geomspace(1, 30, 100)
     plt.show()
+
+
+def test_m():
+    m_sample = np.array([ru.rand_m3() for _ in range(NUM_SAMPLES)])
+    print(m_sample.mean())

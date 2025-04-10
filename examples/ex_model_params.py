@@ -237,7 +237,7 @@ def save_fig():
 
 
 if __name__ == '__main__':
-    vary_param(param_name='n_tot', param_values=np.geomspace(1E-4, 1, 20), num_systems=[40000]*20)
-    vary_param(param_name='sigma_v', param_values=np.linspace(0.211, 6.33, 20), num_systems=[40000]*20)
-    vary_param(param_name='a_init', param_values=np.linspace(1, 10, 20), num_systems=[40000]*20)
+    # vary_param(param_name='n_tot', param_values=np.geomspace(1E-4, 1, 20), num_systems=[40000]*20)
+    # vary_param(param_name='sigma_v', param_values=np.linspace(0.211, 6.33, 20), num_systems=[40000]*20)
+    # vary_param(param_name='a_init', param_values=np.linspace(1, 10, 20), num_systems=[40000]*20)
     save_fig()
