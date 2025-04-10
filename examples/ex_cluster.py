@@ -1,6 +1,7 @@
 from matplotlib.animation import FuncAnimation
 
-from hjmodel.cluster import DynamicPlummer
+# from hjmodel.cluster import DynamicPlummer
+from hjmodel.fixed_cluster import Plummer
 import numpy as np
 import matplotlib.pyplot as plt
 import scienceplots
@@ -8,12 +9,7 @@ plt.style.use(['science', 'nature'])
 
 
 def test_density_evolution():
-    plummer = DynamicPlummer(M0=(1.64E6, 0.9E6),
-                             rt=(86, 70),
-                             rh=(1.91, 4.96),
-                             N=(2E6, 1.85E6),
-                             total_time=12000)
-
+    plummer = Plummer(N0=2E6, R0=1.91, A=6.991e-4, rt=86)
     r_values = np.geomspace(0.001, 86, 100)
 
     fig, axs = plt.subplots(nrows=2, ncols=1, gridspec_kw={'height_ratios': [1, 1]}, sharex=True)
@@ -46,11 +42,7 @@ def test_density_evolution():
     plt.savefig('test_data/test_cluster_data/test_density_evolution.pdf', format='pdf')
 
 def test_lagrange_radii():
-    plummer = DynamicPlummer(M0=(1.64E6, 0.9E6),
-                             rt=(86, 70),
-                             rh=(1.91, 4.96),
-                             N=(2E6, 1.85E6),
-                             total_time=12000)
+    plummer = Plummer(N0=2E6, R0=1.91, A=6.991e-4, rt=86)
 
     n_samples = 1000
     t_values = np.linspace(0, 12000, 200)  # 200 frames
