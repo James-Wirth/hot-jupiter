@@ -27,27 +27,11 @@ MAX_HJ_PERIOD = 10/365      # yr
 MAX_WJ_PERIOD = 100/365     # yr
 
 SC_DICT = {
-    'NM': 0,
-    'I': 1,
-    'TD': 2,
-    'HJ': 3,
-    'WJ': 4
-}
-
-COLOR_DICT = {
-    SC_DICT['NM']: ['#7F7F7F', 'm'],
-    SC_DICT['I']: ['#1b2a49', 'g'],
-    SC_DICT['TD']: ['#769EAA', 'b'],
-    SC_DICT['HJ']: ['#D62728', 'r'],
-    SC_DICT['WJ']: ['#FF7F0E', 'o']
-}
-
-PALETTE = {
-    0: '#7F7F7F',
-    1: '#1b2a49',
-    2: '#769EAA',
-    3: '#D62728',
-    4: '#FF7F0E'
+    'NM': {'id': 0, 'hex': '#7F7F7F'},
+    'I': {'id': 1, 'hex': '#1b2a49'},
+    'TD': {'id': 2, 'hex': '#769EAA'},
+    'HJ': {'id': 3, 'hex': '#D62728'},
+    'WJ': {'id': 4, 'hex': '#FF7F0E'},
 }
 
 NUM_CPUS = -1
