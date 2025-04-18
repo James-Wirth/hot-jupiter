@@ -1,8 +1,9 @@
-from hjmodel.config import *
 import numpy as np
 import rebound
 from scipy.optimize import fsolve
 from typing import Tuple
+
+from hjmodel.config import *
 
 # uniform range of possible starting mean anomalies for planetary orbit
 mean_anoms = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)

@@ -4,99 +4,79 @@ import glob
 import gc
 import pandas as pd
 from joblib import Parallel, delayed, cpu_count
-from tqdm import contrib
 from pathlib import Path
 import dask.dataframe as dd
-from typing import List
+from typing import Dict
+import tqdm
 
 from hjmodel.config import *
-from hjmodel import model_utils, rand_utils
-from clusters.plummer import Plummer
+from hjmodel import model_utils
+from hjmodel.random_sampler import EncounterSampler, PlanetarySystem, PlanetarySystemList
+from clusters import Plummer
 
 pd.options.mode.chained_assignment = None
 
-def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
-                        lagrange: float, cluster: Plummer, total_time: int,
-                        hybrid_switch: bool = True) -> List:
-    """
-    Calculates outcome for a given (randomised) system in the cluster
-
-    Inputs
-    ----------
-    e_init: float               Initial eccentricity (Rayleigh)
-    a_init: float               Initial semi-major axis                     au
-    m1: float                   Host star mass                              M_solar
-    m2: float                   Planet mass                                 M_solar
-    cluster: DynamicPlummer     Cluster profile                             ---
-    total_time: int             Time duration of simulation                 Myr
-
-    Returns
-    ----------
-    [e, a, stopping_condition, stopping_time]: list
-    """
+def eval_system_dynamic(ps: PlanetarySystem, cluster: Plummer,
+                        total_time: int, hybrid_switch: bool = True) -> Dict:
 
     # get critical radii and initialize running variables
-    R_td, R_hj, R_wj = model_utils.get_critical_radii(m1=m1, m2=m2)
-    e, a, current_time, stopping_time = e_init, a_init, 0, 0
+    R_td, R_hj, R_wj = model_utils.get_critical_radii(m1=ps.sys["m1"], m2=ps.sys["m2"])
+    e, a = ps.sys["e_init"], ps.sys["a_init"]
+
+    t = 0
     stopping_condition = None
 
-    def check_stopping_conditions(e, a, current_time):
-        if e >= 1:
+    def _check_stopping_conditions(_e, _a, _t):
+        if _e >= 1:
             return SC_DICT['I']['id']
-        if a * (1 - e) < R_td:
+        if _a * (1 - _e) < R_td:
             return SC_DICT['TD']['id']
-        if a < R_hj and (e <= 1E-3 or current_time >= total_time):
+        if _a < R_hj and (_e <= 1E-3 or _t >= total_time):
             return SC_DICT['HJ']['id']
-        if R_hj < a < R_wj and (e <= 1E-3 or current_time >= total_time):
+        if R_hj < _a < R_wj and (_e <= 1E-3 or _t >= total_time):
             return SC_DICT['WJ']['id']
-        if e <= 1E-3:
+        if _e <= 1E-3:
             return SC_DICT['NM']['id']
         return None
 
-    while current_time < total_time:
-
-        # check stopping conditions before tidal evolution
-        stopping_condition = check_stopping_conditions(e, a, current_time)
-        if stopping_condition is not None:
+    while t < total_time:
+        if (stopping_id := _check_stopping_conditions(_e=e, _a=a, _t=t)) is not None:
             break
 
-        r = cluster.map_lagrange_to_radius(lagrange, current_time)
-        env_vars = cluster.env_vars(r, current_time)
-        perts_per_Myr = model_utils.get_perts_per_Myr(*env_vars.values())
-        wt_time = rand_utils.get_waiting_time(perts_per_Myr=perts_per_Myr)
+        r = cluster.get_radius(lagrange=ps.lagrange, t=t)
+        env_vars = cluster.env_vars(r, t)
+
+        encounter_sampler = EncounterSampler(sigma_v=env_vars["sigma_v"])
+        wt_time = encounter_sampler.get_waiting_time(env_vars=env_vars)
 
         # tidal evolution
-        e, a = model_utils.tidal_effect(e=e, a=a, m1=m1, m2=m2, time_in_Myr=wt_time)
-        current_time = min(current_time + wt_time, total_time)
+        e, a = model_utils.tidal_effect(e=e, a=a, m1=ps.sys["m1"], m2=ps.sys["m2"], time_in_Myr=wt_time)
+        t = min(t + wt_time, total_time)
 
         # check stopping conditions after tidal evolution
-        stopping_condition = check_stopping_conditions(e, a, current_time)
-        if stopping_condition is not None:
+        if (stopping_id := _check_stopping_conditions(_e=e, _a=a, _t=t)) is not None:
             break
 
-        if stopping_condition is None and current_time < total_time:
-            rand_params = rand_utils.random_encounter_params(sigma_v=env_vars['sigma_v'])
-            args = {
-                'v_infty': rand_params['v_infty'],
-                'b': rand_params['b'],
-                'Omega': rand_params['Omega'],
-                'inc': rand_params['inc'],
-                'omega': rand_params['omega'],
-                'e_init': e,
-                'a_init': a,
-                'm1': m1,
-                'm2': m2,
-                'm3': rand_params['m3']
-            }
+        rand_params = encounter_sampler.sample_encounter()
+        kwargs = rand_params | {
+            "e": e,
+            "a": a,
+            "m1": ps.sys["m1"],
+            "m2": ps.sys["m2"]
+        }
+        if model_utils.is_analytic_valid(**kwargs, sigma_v=env_vars["sigma_v"]) or not hybrid_switch:
+            e += model_utils.de_HR(**kwargs)
+        else:
+            de, da = model_utils.de_sim(**kwargs)
+            e += de
+            a += da
 
-            if model_utils.is_analytic_valid(*args.values(), sigma_v=env_vars['sigma_v']) or not hybrid_switch:
-                e += model_utils.de_HR(*args.values())
-            else:
-                de, da = model_utils.de_sim(*args.values())
-                e += de
-                a += da
-
-    return [e, a, stopping_condition if stopping_condition is not None else SC_DICT['NM']['id'], current_time]
+    return {
+        "final_e": e,
+        "final_a": a,
+        "stopping_condition": stopping_condition if stopping_condition is not None else SC_DICT['NM']['id'],
+        "stopping_time": t
+    }
 
 class HJModel:
     def __init__(self, res_path: str):
@@ -119,10 +99,8 @@ class HJModel:
 
     def run_dynamic(self, time: int, num_systems: int, cluster: Plummer,
                     num_batches: int = 250, hybrid_switch: bool = True):
-
         self.time = time
         self.num_systems = num_systems
-
         batch_size = num_systems // num_batches
         print(f"Evaluating {self.num_systems} systems over {num_batches} partitions (t = {self.time} Myr)")
 
@@ -132,29 +110,21 @@ class HJModel:
             shutil.rmtree(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        lagrange = cluster.get_lagrange_distribution(n_samples=batch_size, t=0)
+        planetary_systems = PlanetarySystemList(n_samples=batch_size, cluster=cluster)
 
         def process_and_write_partition(batch_idx: int):
             print(f"Processing partition {batch_idx + 1}/{num_batches}")
-            sys = rand_utils.get_random_system_params(n_samples=batch_size)
             results = Parallel(n_jobs=cpu_count() - 1, prefer="threads", batch_size="auto", require="sharedmem")(
-                delayed(eval_system_dynamic)(*args, cluster, self.time, hybrid_switch) for args in contrib.tzip(*sys, lagrange)
+                delayed(eval_system_dynamic)(ps=ps, cluster=cluster, total_time=self.time, hybrid_switch=hybrid_switch)
+                for ps in tqdm.tqdm(planetary_systems)
             )
-            present_r_vals = np.vectorize(cluster.map_lagrange_to_radius)(lagrange, t=time)
-            partition_df = pd.DataFrame({
-                "r": present_r_vals,
-                "final_e": np.array([row[0] for row in results], dtype=np.float32),
-                "final_a": np.array([row[1] for row in results], dtype=np.float32),
-                "stopping_condition": np.array([row[2] for row in results], dtype=np.int8),
-                "stopping_time": np.array([row[3] for row in results], dtype=np.float32),
-                "e_init": sys[0],
-                "a_init": sys[1],
-                "m1": sys[2],
-            })
+            partition_df = pd.DataFrame([
+                {"r": cluster.get_radius(lagrange=ps.lagrange, t=self.time), **ps.sys, **res}
+                for ps, res in zip(planetary_systems, results)
+            ])
             partition_path = output_dir / f"partition_{batch_idx + 1}.parquet"
             partition_df.to_parquet(partition_path, engine="pyarrow", compression="snappy")
-
-            del sys, results, partition_df, present_r_vals
+            del results, partition_df
             gc.collect()
 
         for i in range(num_batches):
