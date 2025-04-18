@@ -1,9 +1,10 @@
 import os
 import matplotlib.pyplot as plt
+import scienceplots
 
 plt.style.use(['science','nature'])
 
-def get_res_path(exp_name: str):
+def get_res_path(exp_name: str) -> str:
     dir_path = os.path.dirname(os.path.realpath(__file__))
     res_path = os.path.join(dir_path, 'data', f'exp_data_{exp_name}.pq')
     return res_path
@@ -36,6 +37,6 @@ def plot(exp_name: str):
 
 
 if __name__ == '__main__':
-    plot(exp_name="47_TUC_HYBRID")
+    run(exp_name="TEST")
 
 

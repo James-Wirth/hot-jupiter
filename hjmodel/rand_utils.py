@@ -1,20 +1,15 @@
 import random
 import math
 from joblib import delayed, Parallel
-from hjmodel.config import *
 from scipy.optimize import fsolve
 from typing import List, Dict
 
+from hjmodel.config import *
+
 def rand_b(override_b_max=B_MAX) -> float:
-    """
-    b: float            Random impact parameter (au)
-    """
     return np.sqrt(random.random() * override_b_max ** 2)
 
 def rand_v_infty(sigma_v: float) -> float:
-    """
-    v_infty: float      Random asymptotic relative speed (au per year)
-    """
     y = random.random()
     sigma_rel = sigma_v * np.sqrt(2)
     cdf = lambda x: math.erf(x / (np.sqrt(2) * sigma_rel)) - ((np.sqrt(2) * x) / (np.sqrt(np.pi) * sigma_rel)) * np.exp(
@@ -23,25 +18,12 @@ def rand_v_infty(sigma_v: float) -> float:
     return ans
 
 def rand_i() -> float:
-    """
-    inc: float          Inclination angle
-    """
     return np.arccos(1 - 2 * random.random())
 
 def rand_2pi() -> float:
-    """
-    Returns
-    ----------
-    inc: float          Angle between 0 and 2pi
-    """
     return random.random() * 2 * np.pi
 
 def rand_m3() -> float:
-    """
-    Returns
-    ----------
-    m3: float           Mass of perturbing star (M_solar)
-    """
     y = random.random()
     a = 1.8 / (4 * (M_BR ** 0.6) - 3 * (M_MIN ** 0.6) - (M_BR ** 2.4) * M_MAX ** (-1.8))
     b = a * (M_BR ** 2.4)
@@ -52,16 +34,6 @@ def rand_m3() -> float:
         return ((M_BR ** -1.8) + (1.8 / b) * (y_crit - y)) ** (-1 / 1.8)
 
 def random_encounter_params(sigma_v: float, override_b_max=B_MAX) -> Dict[str, float]:
-    """
-    Inputs
-    ----------
-    sigma_v: float          Isotropic velocity dispersion (au per year)
-
-    Returns
-    ----------
-    d: dict[str, float]     Dictionary of random encounter parameters for
-                            each stochastic kick
-    """
     d = {
         'v_infty':  rand_v_infty(sigma_v=sigma_v),
         'b':        rand_b(override_b_max=override_b_max),
