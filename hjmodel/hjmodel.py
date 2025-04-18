@@ -143,7 +143,7 @@ class HJModel:
             dataframes = [pd.read_parquet(f, engine='pyarrow') for f in matching_files]
             self.df = pd.concat(dataframes, ignore_index=True)
 
-        print(self.df.shape[0])
+        # print(self.df.shape[0])
 
         """
         if os.path.exists(self.path):
@@ -176,10 +176,13 @@ class HJModel:
         hybrid_switch : bool, optional
             Toggle hybrid model
         """
+
+        """
         if self.df is not None:
             if not self.check_overwrite():
                 print("Run interrupted.")
                 return
+        """
 
         self.time = time
         self.num_systems = num_systems
