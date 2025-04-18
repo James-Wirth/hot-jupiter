@@ -1,11 +1,9 @@
 import numpy as np
 import rebound
 from scipy.optimize import fsolve
-from typing import Tuple, Dict
+from typing import Tuple
 
 from hjmodel.config import *
-from hjmodel.random_sampler import PlanetarySystem, EncounterSampler
-from clusters import Plummer
 
 # uniform range of possible starting mean anomalies for planetary orbit
 mean_anoms = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)
@@ -196,66 +194,3 @@ def get_critical_radii(m1, m2) -> Tuple[float, float, float]:
 
 def get_perts_per_Myr(local_n_tot, local_sigma_v) -> float:
     return 3.21 * local_n_tot * ((B_MAX / 75) ** 2) * (local_sigma_v * np.sqrt(2))
-
-
-def eval_system_dynamic(ps: PlanetarySystem, cluster: Plummer,
-                        total_time: int, hybrid_switch: bool = True) -> Dict:
-
-    # get critical radii and initialize running variables
-    R_td, R_hj, R_wj = get_critical_radii(m1=ps.sys["m1"], m2=ps.sys["m2"])
-    e, a = ps.sys["e_init"], ps.sys["a_init"]
-
-    t = 0
-    stopping_condition = None
-
-    def _check_stopping_conditions(_e, _a, _t):
-        if _e >= 1:
-            return SC_DICT['I']['id']
-        if _a * (1 - _e) < R_td:
-            return SC_DICT['TD']['id']
-        if _a < R_hj and (_e <= 1E-3 or _t >= total_time):
-            return SC_DICT['HJ']['id']
-        if R_hj < _a < R_wj and (_e <= 1E-3 or _t >= total_time):
-            return SC_DICT['WJ']['id']
-        if _e <= 1E-3:
-            return SC_DICT['NM']['id']
-        return None
-
-    while t < total_time:
-        if (stopping_id := _check_stopping_conditions(_e=e, _a=a, _t=t)) is not None:
-            break
-
-        r = cluster.get_radius(lagrange=ps.lagrange, t=t)
-        env_vars = cluster.env_vars(r, t)
-
-        encounter_sampler = EncounterSampler(sigma_v=env_vars["sigma_v"])
-        wt_time = encounter_sampler.get_waiting_time(env_vars=env_vars)
-
-        # tidal evolution
-        e, a = tidal_effect(e=e, a=a, m1=ps.sys["m1"], m2=ps.sys["m2"], time_in_Myr=wt_time)
-        t = min(t + wt_time, total_time)
-
-        # check stopping conditions after tidal evolution
-        if (stopping_id := _check_stopping_conditions(_e=e, _a=a, _t=t)) is not None:
-            break
-
-        rand_params = encounter_sampler.sample_encounter()
-        kwargs = rand_params | {
-            "e": e,
-            "a": a,
-            "m1": ps.sys["m1"],
-            "m2": ps.sys["m2"]
-        }
-        if is_analytic_valid(**kwargs, sigma_v=env_vars["sigma_v"]) or not hybrid_switch:
-            e += de_HR(**kwargs)
-        else:
-            de, da = de_sim(**kwargs)
-            e += de
-            a += da
-
-    return {
-        "final_e": e,
-        "final_a": a,
-        "stopping_condition": stopping_condition if stopping_condition is not None else SC_DICT['NM']['id'],
-        "stopping_time": t
-    }
