@@ -9,7 +9,7 @@ plt.style.use(['science', 'nature'])
 
 
 def test_density_evolution():
-    plummer = Plummer(N0=2E6, R0=1.91, A=6.991e-4, rt=86)
+    plummer = Plummer()
     r_values = np.geomspace(0.001, 86, 100)
 
     fig, axs = plt.subplots(nrows=2, ncols=1, gridspec_kw={'height_ratios': [1, 1]}, sharex=True)
@@ -42,8 +42,7 @@ def test_density_evolution():
     plt.savefig('test_data/test_cluster_data/test_density_evolution.pdf', format='pdf')
 
 def test_lagrange_radii():
-    plummer = Plummer(N0=2E6, R0=1.91, A=6.991e-4, rt=86)
-
+    plummer = Plummer()
     n_samples = 1000
     t_values = np.linspace(0, 12000, 200)  # 200 frames
 
@@ -53,7 +52,7 @@ def test_lagrange_radii():
 
     fig, ax = plt.subplots()
     histogram, edges, _ = ax.hist([], bins=200, color='blue', alpha=0.7)
-    ax.set_xlim(0, 200)
+    ax.set_xlim(0, 100)
     ax.set_xlabel("Radial Distance")
     ax.set_ylabel("Frequency")
     title = ax.set_title("Radial Distribution at t=0")
@@ -65,7 +64,7 @@ def test_lagrange_radii():
         ax.clear()
         ax.hist(data, bins=200, color='blue', alpha=0.7, density=True)
         ax.hist(data_old, bins=200, color='red', alpha=0.7, density=True)
-        ax.set_xlim(0, 200)
+        ax.set_xlim(0, 100)
         ax.set_xlabel("Radial Distance")
         ax.set_ylabel("Frequency")
         ax.set_title(f"Radial Distribution at t={int(t)}")
