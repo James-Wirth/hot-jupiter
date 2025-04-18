@@ -62,14 +62,6 @@ class Plummer:
         r_scaled = r / self.a(t)
         return (r_scaled ** 3) / (1 + r_scaled ** 2) ** 1.5
 
-    def get_radial_distribution(self, n_samples: int, t: float) -> list:
-        cdf_r_max = self.cdf(self.r_max, t)
-
-        def inverse_cdf(y):
-            return fsolve(lambda r: self.cdf(r, t) - y, self.rh(t))[0]
-
-        return Parallel(n_jobs=NUM_CPUS)(delayed(inverse_cdf)(y)
-                                         for y in np.linspace(0, cdf_r_max, n_samples + 1)[1:])
 
     def get_lagrange_distribution(self, n_samples: int, t: float, seed=None) -> np.ndarray:
         if seed is not None:
@@ -81,5 +73,5 @@ class Plummer:
             for i in range(n_samples)
         ])
 
-    def map_lagrange_to_radius(self, lagrange: float, t: float) -> float:
+    def get_radius(self, lagrange: float, t: float) -> float:
         return newton(lambda r: self.cdf(r, t) - lagrange, self.rh(t))
