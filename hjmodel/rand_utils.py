@@ -3,6 +3,7 @@ import math
 from joblib import delayed, Parallel
 from hjmodel.config import *
 from scipy.optimize import fsolve
+from typing import List, Dict
 
 def rand_b(override_b_max=B_MAX) -> float:
     """
@@ -50,7 +51,7 @@ def rand_m3() -> float:
     else:
         return ((M_BR ** -1.8) + (1.8 / b) * (y_crit - y)) ** (-1 / 1.8)
 
-def random_encounter_params(sigma_v: float, override_b_max=B_MAX) -> dict[str, float]:
+def random_encounter_params(sigma_v: float, override_b_max=B_MAX) -> Dict[str, float]:
     """
     Inputs
     ----------
@@ -88,7 +89,7 @@ def rand_m1() -> float:
 def rand_m2() -> float:
     return 1E-3
 
-def get_random_system_params(n_samples:int) -> list:
+def get_random_system_params(n_samples:int) -> List:
     d = [
         Parallel(n_jobs=NUM_CPUS)(delayed(rand_e_init)() for _ in range(n_samples)),
         Parallel(n_jobs=NUM_CPUS)(delayed(rand_a_init)() for _ in range(n_samples)),
