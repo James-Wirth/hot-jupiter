@@ -7,6 +7,7 @@ from joblib import Parallel, delayed, cpu_count
 from tqdm import contrib
 from pathlib import Path
 import dask.dataframe as dd
+from typing import List
 
 from hjmodel.config import *
 from hjmodel import model_utils, rand_utils
@@ -16,7 +17,7 @@ pd.options.mode.chained_assignment = None
 
 def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
                         lagrange: float, cluster: Plummer, total_time: int,
-                        hybrid_switch: bool = True) -> list:
+                        hybrid_switch: bool = True) -> List:
     """
     Calculates outcome for a given (randomised) system in the cluster
 
@@ -34,7 +35,7 @@ def eval_system_dynamic(e_init: float, a_init: float, m1: float, m2: float,
     [e, a, stopping_condition, stopping_time]: list
     """
 
-    # Get critical radii and initialize running variables
+    # get critical radii and initialize running variables
     R_td, R_hj, R_wj = model_utils.get_critical_radii(m1=m1, m2=m2)
     e, a, current_time, stopping_time = e_init, a_init, 0, 0
     stopping_condition = None
@@ -115,12 +116,6 @@ class HJModel:
             dataframes = [pd.read_parquet(f, engine='pyarrow') for f in matching_files]
             self.df = pd.concat(dataframes, ignore_index=True)
 
-
-    def check_overwrite(self):
-        ans = input(f'Data already exists at {self.path}.\nDo you want to overwrite? (Y/n): ')
-        while not ans.lower() in ['y', 'yes', 'n', 'no']:
-            ans = input('Invalid response. Please re-enter (Y/n): ')
-        return ans.lower() in ['y', 'yes']
 
     def run_dynamic(self, time: int, num_systems: int, cluster: Plummer,
                     num_batches: int = 250, hybrid_switch: bool = True):
