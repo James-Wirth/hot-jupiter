@@ -2,6 +2,7 @@ from hjmodel.config import *
 import numpy as np
 import rebound
 from scipy.optimize import fsolve
+from typing import Tuple
 
 # uniform range of possible starting mean anomalies for planetary orbit
 mean_anoms = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)
@@ -20,25 +21,25 @@ def true_anomaly_approximation(mean_anom: float, e: float) -> float:
     T4 = ((13/12) * e**3) * np.sin(3*mean_anom)
     return T1 + T2 + T3 + T4
 
-def get_true_anomaly(mean_anom: float, e:float) -> float:
+def get_true_anomaly(mean_anom: float, e:float, e_cutoff: float = 0.3) -> float:
     """
     Calculates the true anomaly corresponding to the
     mean anomaly mean_anom for an orbit with eccentricity e
     """
-    if e < 0.3:
+    if e < e_cutoff:
         return true_anomaly_approximation(mean_anom, e)
     else:
         ecc_anom, *info = fsolve(lambda E: kepler(E, e) - mean_anom, 0)
         beta = e / (1 + np.sqrt(1 - e ** 2))
         return ecc_anom + 2 * np.arctan((beta * np.sin(ecc_anom)) / (1 - beta * np.cos(ecc_anom)))
 
-def get_pert_orbit_params(v_infty: float, b: float, m1: float, m2: float) -> (float, float, float):
+def get_pert_orbit_params(v_infty: float, b: float, m1: float, m2: float) -> Tuple[float, float, float]:
     a_pert = -G * (m1 + m2) / (v_infty ** 2)
     e_pert = np.sqrt(1 + (b / a_pert) ** 2)
     rp = -a_pert * (e_pert - 1)
     return a_pert, e_pert, rp
 
-def get_int_params(a_pert: float, e_pert: float, rp: float):
+def get_int_params(a_pert: float, e_pert: float, rp: float) -> Tuple[float, float]:
     # max true anomaly (at infinity)
     max_anomaly = np.arccos(-1 / e_pert)
     # boundary points of perturbing trajectory calculated from parameter XI
@@ -86,7 +87,7 @@ def de_HR(v_infty: float, b: float, Omega: float, inc: float, omega: float,
     return alpha*y*((a / rp) ** (3 / 2))*(Theta1 * chi + (Theta2 + Theta3) * psi)
 
 def de_sim(v_infty: float, b: float, Omega: float, inc: float, omega: float,
-           e: float, a: float, m1: float, m2: float, m3: float) -> (float, float):
+           e: float, a: float, m1: float, m2: float, m3: float) -> Tuple[float, float]:
     """
     Calculates the N-body eccentricity and semi-major axis excitations
     using the REBOUND code
@@ -172,23 +173,23 @@ def da_tid_dt(e: float, a: float, m1: float, m2: float) -> float:
 def get_dn(dedn: float, dadn: float, e: float, a: float, C: float, n_cum: float) -> float:
     return min(1 - n_cum, C / max(np.abs(dedn) / e, np.abs(dadn) / a))
 
-def tidal_effect(e: float, a: float, m1: float, m2: float, time_in_Myr: float) -> (float, float):
+def tidal_effect(e: float, a: float, m1: float, m2: float, time_in_Myr: float, C: float = 0.01) -> Tuple[float, float]:
     # let n be normalised time (i.e. n(0) = 0, n(time_in_Myr) = 1)
     n_cum = 0
     while n_cum < 1 and e > 1E-3:
         dedn = de_tid_dt(e=e, a=a, m1=m1, m2=m2) * time_in_Myr
         dadn = da_tid_dt(e=e, a=a, m1=m1, m2=m2) * time_in_Myr
-        dn = get_dn(dedn, dadn, a, e, 0.01, n_cum)
+        dn = get_dn(dedn, dadn, a, e, C, n_cum)
         n_cum += dn
         e += dedn * dn
         a += dadn * dn
     return e, a
 
-def get_critical_radii(m1, m2):
+def get_critical_radii(m1, m2) -> Tuple[float, float, float]:
     R_td = ETA * R_P * (m1 / m2) ** (1 / 3)
     R_hj = (MAX_HJ_PERIOD ** 2 * (m1 + m2)) ** (1 / 3)
     R_wj = (MAX_WJ_PERIOD ** 2 * (m1 + m2)) ** (1 / 3)
     return R_td, R_hj, R_wj
 
-def get_perts_per_Myr(local_n_tot, local_sigma_v):
+def get_perts_per_Myr(local_n_tot, local_sigma_v) -> float:
     return 3.21 * local_n_tot * ((B_MAX / 75) ** 2) * (local_sigma_v * np.sqrt(2))
