@@ -1,11 +1,10 @@
 import numpy as np
-from scipy import integrate
-from scipy.optimize import fsolve, newton
-from joblib import delayed, Parallel
+from scipy.optimize import newton
 
+from cluster import Cluster
 from hjmodel.config import G, AU_PER_PSC, NUM_CPUS
 
-class Plummer:
+class Plummer(Cluster):
     """
     Plummer class
     Calculates density and velocity dispersion profiles of globular clusters
@@ -14,6 +13,7 @@ class Plummer:
     """
 
     def __init__(self, N0: float = 2E6, R0: float = 1.91, A: float = 6.991e-4, r_max: float = 100):
+        super().__init__()
         self.N0 = N0
         self.R0 = R0
         self.A = A

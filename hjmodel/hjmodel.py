@@ -40,8 +40,11 @@ def eval_system_dynamic(ps: PlanetarySystem, cluster: Plummer,
         return None
 
     while t < total_time:
-        if (stopping_id := _check_stopping_conditions(_e=e, _a=a, _t=t)) is not None:
+        stopping_condition = _check_stopping_conditions(_e=e, _a=a, _t=t)
+        if stopping_condition is not None:
             break
+        else:
+            pass
 
         # get local cluster environment
         r = cluster.get_radius(lagrange=ps.lagrange, t=t)
@@ -54,8 +57,12 @@ def eval_system_dynamic(ps: PlanetarySystem, cluster: Plummer,
         t = min(t + wt_time, total_time)
 
         # check stopping conditions after tidal evolution
-        if (stopping_id := _check_stopping_conditions(_e=e, _a=a, _t=t)) is not None:
+        stopping_condition = _check_stopping_conditions(_e=e, _a=a, _t=t)
+        if stopping_condition is not None:
             break
+        else:
+            pass
+
         rand_params = encounter_sampler.sample_encounter()
         kwargs = rand_params | {
             "e": e,
@@ -69,7 +76,6 @@ def eval_system_dynamic(ps: PlanetarySystem, cluster: Plummer,
             de, da = model_utils.de_sim(**kwargs)
             e += de
             a += da
-
     return {
         "final_e": e,
         "final_a": a,

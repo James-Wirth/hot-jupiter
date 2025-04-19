@@ -13,13 +13,13 @@ def run(exp_name: str):
     from hjmodel import HJModel
     from clusters.plummer import Plummer
 
-    for i in range(0, 1):
+    for i in range(0, 10):
         run_name = f'{exp_name}_RUN{i}'
         res_path = get_res_path(exp_name=run_name)
 
         plummer = Plummer()
         model = HJModel(res_path=res_path)
-        model.run_dynamic(time=12000, num_systems=50000, cluster=plummer, hybrid_switch=True)
+        model.run_dynamic(time=12000, num_systems=1000, cluster=plummer, hybrid_switch=False)
 
 def plot(exp_name: str):
     from hjmodel import HJModel
@@ -31,12 +31,12 @@ def plot(exp_name: str):
     # example to show probability vs projected radius
     fig, ax = plt.subplots()
     processor = Processor(data=model.df)
-    processor.plot_projected_probability(ax=ax)
+    print(processor.compute_outcome_probabilities())
     plt.show()
 
 
 
 if __name__ == '__main__':
-    run(exp_name="TEST")
+    plot(exp_name="TEST")
 
 
