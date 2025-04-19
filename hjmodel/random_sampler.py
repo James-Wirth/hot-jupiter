@@ -6,7 +6,7 @@ from scipy.optimize import fsolve
 
 from hjmodel.config import *
 from hjmodel.model_utils import get_perts_per_Myr
-from clusters import Plummer
+from clusters.cluster import Cluster
 
 class PlanetarySystem:
     sys: Dict[str, float]
@@ -19,7 +19,7 @@ class PlanetarySystem:
 
 
 class PlanetarySystemList(list):
-    def __init__(self, n_samples: int, cluster: Plummer):
+    def __init__(self, n_samples: int, cluster: Cluster):
         # call the parent list.__init__ with your generated list
         super().__init__( sample_planetary_systems(n_samples=n_samples, cluster=cluster) )
 
@@ -103,7 +103,7 @@ def sample_m2() -> float:
 
 def sample_planetary_systems(
     n_samples: int,
-    cluster: Plummer,
+    cluster: Cluster,
     num_cpus: int = NUM_CPUS
 ) -> List[PlanetarySystem]:
 
