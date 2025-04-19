@@ -12,11 +12,11 @@ import tqdm
 from hjmodel.config import *
 from hjmodel import model_utils
 from hjmodel.random_sampler import EncounterSampler, PlanetarySystem, PlanetarySystemList
-from clusters import Plummer
+from clusters.cluster import Cluster
 
 pd.options.mode.chained_assignment = None
 
-def eval_system_dynamic(ps: PlanetarySystem, cluster: Plummer,
+def eval_system_dynamic(ps: PlanetarySystem, cluster: Cluster,
                         total_time: int, hybrid_switch: bool = True) -> Dict:
 
     # get critical radii and initialize running variables
@@ -48,11 +48,11 @@ def eval_system_dynamic(ps: PlanetarySystem, cluster: Plummer,
 
         # get local cluster environment
         r = cluster.get_radius(lagrange=ps.lagrange, t=t)
-        env_vars = cluster.env_vars(r, t)
-        encounter_sampler = EncounterSampler(sigma_v=env_vars["sigma_v"])
+        env = cluster.get_local_environment(r, t)
+        encounter_sampler = EncounterSampler(sigma_v=env["sigma_v"])
 
         # tidal evolution between encounters
-        wt_time = encounter_sampler.get_waiting_time(env_vars=env_vars)
+        wt_time = encounter_sampler.get_waiting_time(env_vars=env)
         e, a = model_utils.tidal_effect(e=e, a=a, m1=ps.sys["m1"], m2=ps.sys["m2"], time_in_Myr=wt_time)
         t = min(t + wt_time, total_time)
 
@@ -70,7 +70,7 @@ def eval_system_dynamic(ps: PlanetarySystem, cluster: Plummer,
             "m1": ps.sys["m1"],
             "m2": ps.sys["m2"]
         }
-        if model_utils.is_analytic_valid(**kwargs, sigma_v=env_vars["sigma_v"]) or not hybrid_switch:
+        if model_utils.is_analytic_valid(**kwargs, sigma_v=env["sigma_v"]) or not hybrid_switch:
             e += model_utils.de_HR(**kwargs)
         else:
             de, da = model_utils.de_sim(**kwargs)
@@ -102,7 +102,7 @@ class HJModel:
             self.df = pd.concat(dataframes, ignore_index=True)
 
 
-    def run_dynamic(self, time: int, num_systems: int, cluster: Plummer,
+    def run_dynamic(self, time: int, num_systems: int, cluster: Cluster,
                     num_batches: int = 250, hybrid_switch: bool = True):
         self.time = time
         self.num_systems = num_systems
