@@ -134,11 +134,14 @@ class HJModel:
 
         for i in range(num_batches):
             process_and_write_partition(i)
-
+    
         print("All partitions processed. Combining results with Dask...")
         ddf = dd.read_parquet(str(output_dir / "*.parquet"))
         print(f"Saving combined dataset to {self.path}")
+
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
         ddf.to_parquet(self.path, engine="pyarrow", write_index=False)
+
         for partition_file in output_dir.glob("partition_*.parquet"):
             partition_file.unlink()
         output_dir.rmdir()
