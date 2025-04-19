@@ -11,15 +11,18 @@ def get_res_path(exp_name: str) -> str:
 
 def run(exp_name: str):
     from hjmodel import HJModel
+    from clusters.cluster import Cluster
     from clusters.plummer import Plummer
 
     for i in range(0, 10):
         run_name = f'{exp_name}_RUN{i}'
         res_path = get_res_path(exp_name=run_name)
 
-        plummer = Plummer()
+        plummer_profile = Plummer(N0=2e6, R0=1.91, A=6.991e-4)
+        cluster = Cluster(profile=plummer_profile, r_max=100)
+
         model = HJModel(res_path=res_path)
-        model.run_dynamic(time=12000, num_systems=1000, cluster=plummer, hybrid_switch=False)
+        model.run_dynamic(time=12000, num_systems=1000, cluster=cluster, hybrid_switch=False)
 
 def plot(exp_name: str):
     from hjmodel import HJModel
