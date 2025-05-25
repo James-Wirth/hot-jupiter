@@ -56,7 +56,7 @@ The last parameter `hybrid_switch` controls whether to apply the hybrid model (w
 To explore the results, create a `Processor` instance:
 
 ```python
-processor = Processor(data=model.df)
+processor = Processor(model=model)
 ```
 
 To view summary stistics:
