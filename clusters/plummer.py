@@ -1,3 +1,7 @@
+"""
+An example density profile
+"""
+
 import numpy as np
 
 from clusters.cluster import DensityProfile

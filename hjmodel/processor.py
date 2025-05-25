@@ -1,12 +1,22 @@
+"""
+Processing model results
+"""
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+
 from typing import Dict, List, Tuple, Optional
 
 from hjmodel.config import SC_DICT
 
 class Processor:
+
+    """
+    Provides methods for processing and displaying the results of a HJModel simulation
+    """
+
     def __init__(
         self,
         data: pd.DataFrame,
