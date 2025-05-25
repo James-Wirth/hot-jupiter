@@ -1,5 +1,10 @@
+"""
+Methods for generating samples of our random variables
+"""
+
 import math
 import random
+
 from typing import Dict, List
 from joblib import Parallel, delayed
 from scipy.optimize import fsolve
@@ -20,11 +25,15 @@ class PlanetarySystem:
 
 class PlanetarySystemList(list):
     def __init__(self, n_samples: int, cluster: Cluster):
-        # call the parent list.__init__ with your generated list
         super().__init__( sample_planetary_systems(n_samples=n_samples, cluster=cluster) )
 
 
 class EncounterSampler:
+
+    """
+    Generates randomized parameters for a single encounter
+    """
+
     def __init__(self, sigma_v: float, override_b_max: float = B_MAX,
                  rng: random.Random = None):
         self.sigma_v = sigma_v

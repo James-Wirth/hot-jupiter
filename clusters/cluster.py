@@ -14,6 +14,10 @@ class DensityProfile(ABC):
 
 
 class Cluster:
+    """
+    Implements cluster methods, given a density profile
+    """
+
     def __init__(self, profile: DensityProfile, r_max=100):
         self.profile = profile
         self.r_max = r_max

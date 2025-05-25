@@ -1,3 +1,8 @@
+"""
+Implementation of the Heggie-Rasio analytic approximation,
+and the direct N-body REBOUND simulations
+"""
+
 import numpy as np
 import rebound
 from scipy.optimize import fsolve
