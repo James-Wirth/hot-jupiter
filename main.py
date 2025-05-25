@@ -33,7 +33,7 @@ def plot(exp_name: str):
     model = HJModel(res_path=res_path)
 
     # e.g. output outcome probabilities
-    processor = Processor(data=model.df)
+    processor = Processor(model=model)
     print(processor.compute_outcome_probabilities())
 
 
