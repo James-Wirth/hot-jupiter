@@ -10,6 +10,7 @@ import matplotlib.colors as mcolors
 from typing import Dict, List, Tuple, Optional
 
 from hjmodel.config import SC_DICT
+from hjmodel.hjmodel import HJModel
 
 class Processor:
 
@@ -19,10 +20,10 @@ class Processor:
 
     def __init__(
         self,
-        data: pd.DataFrame,
+        model: HJModel,
         sc_dict: Dict = SC_DICT,
     ):
-        self.df = data.copy()
+        self.df = model.df.copy()
         self.sc_dict = sc_dict.copy()
         self.id2label = {info['id']: label for label, info in self.sc_dict.items()}
         self.hex_by_id = {info['id']: info['hex'] for info in self.sc_dict.values()}
