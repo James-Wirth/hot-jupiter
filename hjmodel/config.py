@@ -1,3 +1,7 @@
+"""
+Constants
+"""
+
 import numpy as np
 
 # model constants

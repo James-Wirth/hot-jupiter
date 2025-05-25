@@ -1,13 +1,18 @@
+"""
+Implementation of HJModel class for managing simulation runs
+"""
+
 import os
 import shutil
 import glob
 import gc
+import tqdm
 import pandas as pd
+import dask.dataframe as dd
+
+from typing import Dict
 from joblib import Parallel, delayed, cpu_count
 from pathlib import Path
-import dask.dataframe as dd
-from typing import Dict
-import tqdm
 
 from hjmodel.config import *
 from hjmodel import model_utils
@@ -16,8 +21,16 @@ from clusters.cluster import Cluster
 
 pd.options.mode.chained_assignment = None
 
-def eval_system_dynamic(ps: PlanetarySystem, cluster: Cluster,
-                        total_time: int, hybrid_switch: bool = True) -> Dict:
+def _eval_system_dynamic(
+        ps: PlanetarySystem,
+        cluster: Cluster,
+        total_time: int,
+        hybrid_switch: bool = True
+) -> Dict:
+
+    """
+    Simulates a single planetary system
+    """
 
     # get critical radii and initialize running variables
     R_td, R_hj, R_wj = model_utils.get_critical_radii(m1=ps.sys["m1"], m2=ps.sys["m2"])
@@ -84,6 +97,11 @@ def eval_system_dynamic(ps: PlanetarySystem, cluster: Cluster,
     }
 
 class HJModel:
+
+    """
+    Orchestrator class for running and saving simulations
+    """
+
     def __init__(self, res_path: str):
         self.time = self.num_systems = 0
         self.path = res_path
@@ -102,8 +120,15 @@ class HJModel:
             self.df = pd.concat(dataframes, ignore_index=True)
 
 
-    def run_dynamic(self, time: int, num_systems: int, cluster: Cluster,
-                    num_batches: int = 250, hybrid_switch: bool = True):
+    def run_dynamic(
+        self,
+        time: int,
+        num_systems: int,
+        cluster: Cluster,
+        num_batches: int = 250,
+        hybrid_switch: bool = True
+    ):
+
         self.time = time
         self.num_systems = num_systems
         batch_size = num_systems // num_batches
@@ -120,7 +145,7 @@ class HJModel:
         def process_and_write_partition(batch_idx: int):
             print(f"Processing partition {batch_idx + 1}/{num_batches}")
             results = Parallel(n_jobs=cpu_count() - 1, prefer="threads", batch_size="auto", require="sharedmem")(
-                delayed(eval_system_dynamic)(ps=ps, cluster=cluster, total_time=self.time, hybrid_switch=hybrid_switch)
+                delayed(_eval_system_dynamic)(ps=ps, cluster=cluster, total_time=self.time, hybrid_switch=hybrid_switch)
                 for ps in tqdm.tqdm(planetary_systems)
             )
             partition_df = pd.DataFrame([
@@ -134,7 +159,7 @@ class HJModel:
 
         for i in range(num_batches):
             process_and_write_partition(i)
-    
+
         print("All partitions processed. Combining results with Dask...")
         ddf = dd.read_parquet(str(output_dir / "*.parquet"))
         print(f"Saving combined dataset to {self.path}")
