@@ -9,6 +9,9 @@ class DensityProfile(ABC):
     def get_isotropic_velocity_dispersion(self, r: float, t: float) -> float: pass
 
     @abstractmethod
+    def get_radius(self, lagrange: float, t: float) -> float: pass
+
+    @abstractmethod
     def get_mass_fraction_within_radius(self, r: float, t: float) -> float: pass
 
 
@@ -24,19 +27,17 @@ class Cluster:
 
     def get_number_density(self, r, t): return self.profile.get_number_density(r, t)
     def get_isotropic_velocity_dispersion(self, r, t): return self.profile.get_isotropic_velocity_dispersion(r, t)
+    def get_mass_fraction_within_radius(self, r, t):
+        return self.profile.get_mass_fraction_within_radius(r, t)
+
+    def get_radius(self, lagrange, t):
+        return self.profile.get_radius(lagrange, t)
 
     def get_local_environment(self, r, t):
         return {
             'n_tot': self.get_number_density(r, t),
             'sigma_v': self.get_isotropic_velocity_dispersion(r, t)
         }
-
-    def get_mass_fraction_within_radius(self, r, t):
-        return self.profile.get_mass_fraction_within_radius(r, t)
-
-    def get_radius(self, lagrange, t):
-        from scipy.optimize import newton
-        return newton(lambda r: self.get_mass_fraction_within_radius(r, t) - lagrange, x0=self.r_max / 2)
 
     def get_lagrange_distribution(self, n_samples, t, seed=None):
         if seed is not None:

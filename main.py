@@ -1,44 +1,71 @@
-"""
-An example simulation run
-"""
-
-import os
-
-from hjmodel import HJModel
+import logging
+from pathlib import Path
 
 from clusters.cluster import Cluster
 from clusters.plummer import Plummer
+from hjmodel import HJModel
 
-from hjmodel.processor import Processor
+NAME = "EXAMPLE"
+TIME = 12000  # in Myr
+NUM_SYSTEMS = 5000
+HYBRID_SWITCH = False
+SEED = 42
+R_MAX = 100  # in parsecs
 
-def _get_res_path(exp_name: str) -> str:
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    return os.path.join(dir_path, 'data', f'exp_data_{exp_name}.pq')
+# directory where data/<<RESULTS_PATH>>/results.parquet will be stored
+BASE_DIR = Path(__file__).resolve().parent / "data"
 
-def run(exp_name: str):
+def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
+    logger = logging.getLogger(__name__)
+
+    logger.info("Starting experiment: '%s'", NAME)
 
     cluster = Cluster(
         profile=Plummer(N0=2e6, R0=1.91, A=6.991e-4),
-        r_max=100
+        r_max=R_MAX
     )
 
-    for i in range(0, 10):
-        res_path = _get_res_path(exp_name=f'{exp_name}_RUN{i}')
-        model = HJModel(res_path=res_path)
-        model.run_dynamic(time=12000, num_systems=1000, cluster=cluster, hybrid_switch=True)
-        pass
+    model = HJModel(name=NAME, base_dir=BASE_DIR)
+    logger.info(
+        "Running simulation: name=%s time=%s num_systems=%s seed=%s hybrid_switch=%s",
+        NAME, TIME, NUM_SYSTEMS, SEED, HYBRID_SWITCH
+    )
+    model.run_dynamic(
+        time=TIME,
+        num_systems=NUM_SYSTEMS,
+        cluster=cluster,
+        hybrid_switch=HYBRID_SWITCH,
+        seed=SEED
+    )
 
-def plot(exp_name: str):
-    res_path = _get_res_path(exp_name=exp_name)
-    model = HJModel(res_path=res_path)
+    results = model.results
+    probs = results.compute_outcome_probabilities()
+    logger.info("Outcome probabilities for experiment: '%s':", NAME)
+    for label, p in probs.items():
+        logger.info("  %s: %.4f", label, p)
 
-    # e.g. output outcome probabilities
-    processor = Processor(model=model)
-    print(processor.compute_outcome_probabilities())
+    if model.path is None:
+        logger.error("Model path not set. Cannot write summary.")
+        return
+
+    run_dir = Path(model.path).parent
+    summary_path = run_dir / "summary.txt"
+    run_label = run_dir.name
+
+    with open(summary_path, "w") as f:
+        f.write(f"name={NAME}\n")
+        f.write(f"run_label={run_label}\n")
+        f.write(f"time={TIME}\n")
+        f.write(f"num_systems={NUM_SYSTEMS}\n")
+        f.write(f"hybrid_switch={HYBRID_SWITCH}\n")
+        f.write(f"seed={SEED}\n")
+        f.write("outcome_probabilities:\n")
+        for label, p in probs.items():
+            f.write(f"  {label}: {p:.6f}\n")
+
+    logger.info("Summary written to: %s", summary_path)
 
 
-
-if __name__ == '__main__':
-    plot(exp_name="TEST")
-
-
+if __name__ == "__main__":
+    main()
