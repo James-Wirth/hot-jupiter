@@ -189,7 +189,7 @@ class HJModel:
         logger.info("Created new run directory: %s", run_dir)
         return run_dir
 
-    def run_dynamic(
+    def run(
         self,
         time: int,
         num_systems: int,

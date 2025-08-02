@@ -46,7 +46,7 @@ To run a simulation, use the provided driver script in `main.py`. You can custom
 from hjmodel import HJModel
 
 model = HJModel(name=NAME, base_dir=BASE_DIR)
-model.run_dynamic(
+model.run(
     time=TIME,
     num_systems=NUM_SYSTEMS,
     cluster=cluster,
