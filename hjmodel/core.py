@@ -4,7 +4,7 @@ import rebound
 import numpy as np
 
 from scipy.optimize import fsolve
-from typing import Tuple, Optional
+from typing import Tuple
 
 from hjmodel.config import (
     G,
@@ -21,10 +21,9 @@ from hjmodel.config import (
     MAX_WJ_PERIOD
 )
 
-logger = logging.getLogger(__name__)
+_MEAN_ANOMS_GRID = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)
 
-# uniform range of possible starting mean anomalies for planetary orbit
-mean_anoms = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)
+logger = logging.getLogger(__name__)
 
 def kepler(
     E: float,
@@ -51,7 +50,7 @@ def true_anomaly_approximation(
 
 def get_true_anomaly(
     mean_anom: float,
-    e:float,
+    e: float,
     e_cutoff: float = 0.3
 ) -> float:
     """
@@ -101,10 +100,10 @@ def get_int_params(
     F = np.arccosh((e_pert + np.cos(alpha * max_anomaly)) / (1 + e_pert * np.cos(alpha * max_anomaly)))
     t = (e_pert * np.sinh(F) - F) * (-1 * a_pert) ** (3 / 2)
 
-    # t_int, -f0
+    # t_int, f0
     return 2*t, -alpha*max_anomaly
 
-def de_HR(
+def de_hr(
     v_infty: float,
     b: float,
     Omega: float,
@@ -114,7 +113,7 @@ def de_HR(
     a: float,
     m1: float,
     m2: float,
-    m3:float
+    m3: float
 ) -> float:
     """
     Calculates the eccentricity excitation using the Heggie-Rasio (1986) approximation
@@ -154,7 +153,7 @@ def de_sim(
     # calculate orbital parameters of perturbing trajectory
     a_pert, e_pert, rp = get_pert_orbit_params(v_infty=v_infty, b=b, m1=m1, m2=m2)
     t_int, f0 = get_int_params(a_pert=a_pert, e_pert=e_pert, rp=rp)
-    f_phase = get_true_anomaly(np.random.choice(mean_anoms), e)
+    f_phase = get_true_anomaly(np.random.choice(_MEAN_ANOMS_GRID), e)
 
     # configure REBOUND simulation
     sim = rebound.Simulation()
@@ -198,15 +197,10 @@ def slow_param(
 def is_analytic_valid(
     v_infty: float,
     b: float,
-    Omega: Optional[float],
-    inc: Optional[float],
-    omega: Optional[float],
-    e: Optional[float],
     a: float,
     m1: float,
     m2: float,
-    m3:Optional[float],
-    sigma_v: Optional[float]
+    **kwargs
 ) -> bool:
     """
     Returns True if the tidal parameter > T_MIN *and* the slow parameter > S_MIN
