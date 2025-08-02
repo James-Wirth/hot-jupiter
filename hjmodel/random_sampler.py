@@ -8,7 +8,7 @@ from scipy.optimize import fsolve
 
 from dataclasses import dataclass
 
-from clusters.cluster import Cluster
+from clusters import Cluster
 from hjmodel.config import (
     E_INIT_MAX,
     E_INIT_RMS,

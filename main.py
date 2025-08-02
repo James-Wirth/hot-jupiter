@@ -1,8 +1,8 @@
 import logging
 from pathlib import Path
 
-from clusters.cluster import Cluster
-from clusters.plummer import Plummer
+from clusters import Cluster
+from clusters.profiles.plummer import Plummer
 from hjmodel import HJModel
 
 NAME = "EXAMPLE"
