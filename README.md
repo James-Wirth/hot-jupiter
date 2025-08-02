@@ -74,7 +74,7 @@ results = model.results
 The outcome probabilities can be accessed via:
 
 ```python
-compute_outcome_probabilities(r_range=(R_MIN, R_MAX))
+results.compute_outcome_probabilities(r_range=(R_MIN, R_MAX))
 ```
 
 The `results` object includes built-in methods for generating key plots:
