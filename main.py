@@ -31,7 +31,7 @@ def main():
         "Running simulation: name=%s time=%s num_systems=%s seed=%s hybrid_switch=%s",
         NAME, TIME, NUM_SYSTEMS, SEED, HYBRID_SWITCH
     )
-    model.run_dynamic(
+    model.run(
         time=TIME,
         num_systems=NUM_SYSTEMS,
         cluster=cluster,
