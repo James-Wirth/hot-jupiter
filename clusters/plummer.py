@@ -31,6 +31,15 @@ class Plummer(DensityProfile):
         a_scaled = self.a(t) * AU_PER_PSC
         return np.sqrt(G * self.M_t(t) / (6 * np.sqrt(r_scaled**2 + a_scaled**2)))
 
+    def get_radius(self, lagrange, t):
+        a_t = self.a(t)
+        r_scaled = (lagrange ** (2 / 3)) / (1 - lagrange ** (2 / 3))
+        r_scaled = r_scaled ** 0.5
+        return r_scaled * a_t
+
     def get_mass_fraction_within_radius(self, r, t):
-        r_scaled = r / self.a(t)
-        return (r_scaled**3) / (1 + r_scaled**2)**1.5
+        a_t = self.a(t)
+        r_scaled = r / a_t
+        return (r_scaled ** 3) / ((1 + r_scaled ** 2) ** 1.5)
+
+

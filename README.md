@@ -2,7 +2,7 @@
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 
-**HotJupiter** is a Monte-Carlo simulation package for studying Hot Jupiter formation in dense globular clusters via high-e migration. We have used the [REBOUND](https://github.com/hannorein/rebound) code with the IAS15 numerical integrator to simulate the dynamical evolution of planetary systems due to stellar perturbation.
+**HotJupiter** is a Monte-Carlo simulation package for studying Hot Jupiter formation in dense globular clusters via high-e migration. We have used the [REBOUND](https://github.com/hannorein/rebound) code with the IAS15 numerical integrator to simulate the dynamical evolution of planetary systems due to stellar perturbation over Gyr timescales.
 
 The final states of planetary systems are categorized into five unique outcomes:
 
@@ -27,63 +27,71 @@ pip install -r requirements.txt
 
 ## Usage
 
-To run a simulation, you must provide a cluster instance to serve as the background. We have provided a pre-built, time-dependent Plummer profile:
+Create a cluster instance to serve as the background for the simulation. We have provided a time-dependent Plummer profile for 47-Tuc:
 
 ```python
+
+from clusters.cluster import Cluster
+from clusters.plummer import Plummer
+
 cluster = Cluster(
   profile=Plummer(N0=2e6, R0=1.91, A=6.99e-4),
   r_max=100
 )
 ```
 
-Create a `HJModel` instance and run the simulation using your desired parameters:
+To run a simulation, use the provided driver script in `main.py`. You can customize the run directly:
 
 ```python
-model = HJModel(res_path="YOUR_OUTPUT_PATH.parquet")
+from hjmodel import HJModel
 
+model = HJModel(name=NAME, base_dir=BASE_DIR)
 model.run_dynamic(
-  time=12000,
-  num_systems=1000,
-  cluster=cluster,
-  hybrid_switch=True
+    time=TIME,
+    num_systems=NUM_SYSTEMS,
+    cluster=cluster,
+    hybrid_switch=HYBRID_SWITCH,
+    seed=SEED
 )
 ```
 
-The last parameter `hybrid_switch` controls whether to apply the hybrid model (with direct N-body simulations) or the pure analytic model. 
+This generates:
+
+- A results file: `<BASE_DIR>/NAME/run_XXX/results.parquet`
+- A summary report `<BASE_DIR>/NAME/run_XXX/summary.txt`
+
+Multiple runs with the same name are stored under auto-incrementing run_XXX identifiers. 
+When acessing `model.results` (see next section), data from all runs are automatically aggregated.
 
 ## Results
 
-To explore the results, create a `Processor` instance:
+Access results via:
 
 ```python
-processor = Processor(model=model)
+results = model.results
 ```
 
-To view summary stistics:
+The outcome probabilities can be accessed via:
+
 ```python
-# outcome probabilities
-processor.compute_outcome_probabilities(
-  r_range=(0, 100)
-)
-
-# statistics for specified outcomes
-processor.get_statistics_for_outcomes(
-  outcomes=["HJ"],
-  feature="final_e"
-)
+compute_outcome_probabilities(r_range=(R_MIN, R_MAX))
 ```
 
-To view plots:
+The `results` object includes built-in methods for generating key plots:
+
+| Method                       | Description                                 |
+|-----------------------------|---------------------------------------------|
+| `plot_phase_plane(ax)`      | Phase space: $a$ vs $1/(1-e)$               |
+| `plot_stopping_cdf(ax)`     | CDF of stopping times                       |
+| `plot_sma_distribution(ax)` | Final semi-major axis distributions         |
+| `plot_sma_scatter(ax)`      | Final $a$ vs cluster radius                 |
+| `plot_projected_probability(ax)` | Projected radial outcome probabilities |
+
+**Usage pattern:**
+
 ```python
-# outcome probability vs projected radius
-processor.plot_projected_probability()
+import matplotlib.pyplot as plt
 
-# outcomes in a vs 1/(1-e) phase-space:
-processor.plot_phase_plane()
-
-# stopping time distribution
-processor.plot_stopping_cdf()
-
-# semi-major axis distribution
-processor.plot_sma_distribution()
-```
+fig, ax = plt.subplots()
+results.plot_phase_plane(ax)
+plt.show()
