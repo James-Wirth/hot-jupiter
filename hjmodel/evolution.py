@@ -228,16 +228,15 @@ class PlanetarySystem:
             if self.stopping_condition is not None:
                 break
 
-            rand_params = encounter_sampler.sample_encounter()
             kwargs = {
-                **rand_params,
+                **encounter_sampler.sample_encounter(),
                 "e": self.e,
                 "a": self.a,
                 "m1": self.m1,
                 "m2": self.m2,
             }
-            if core.is_analytic_valid(**kwargs, sigma_v=env["sigma_v"]) or not hybrid_switch:
-                self.e += core.de_HR(**kwargs)
+            if core.is_analytic_valid(**kwargs) or not hybrid_switch:
+                self.e += core.de_hr(**kwargs)
             else:
                 de, da = core.de_sim(**kwargs)
                 self.e += de
