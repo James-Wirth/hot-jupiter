@@ -4,7 +4,7 @@ An example density profile
 
 import numpy as np
 
-from clusters.cluster import DensityProfile
+from clusters import DensityProfile
 from hjmodel.config import G, AU_PER_PSC
 
 class Plummer(DensityProfile):

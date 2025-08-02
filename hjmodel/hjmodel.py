@@ -14,7 +14,7 @@ from typing import Dict, Optional
 from joblib import Parallel, delayed, cpu_count
 from more_itertools import chunked
 
-from clusters.cluster import Cluster
+from clusters import Cluster
 
 from hjmodel.results import Results
 from hjmodel.config import StopCode, CIRCULARISATION_THRESHOLD_ECCENTRICITY
