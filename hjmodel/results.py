@@ -17,6 +17,9 @@ LabelOrEnum = Union[str, StopCode]
 class Results:
     """
     Wrapper for the outputting/plotting results of the HJModel run.
+    An instance of this class can be accessed via the HJModel.results property in the HJModel class
+
+    Contains methods for outputting the outcome probabilites and plotting useful figures.
     """
 
     def __init__(self, df: pd.DataFrame):
