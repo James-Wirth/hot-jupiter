@@ -31,12 +31,12 @@ Create a cluster instance to serve as the background for the simulation. We have
 
 ```python
 
-from clusters.cluster import Cluster
-from clusters.plummer import Plummer
+from clusters import Cluster
+from clusters.profiles.plummer import Plummer
 
 cluster = Cluster(
-  profile=Plummer(N0=2e6, R0=1.91, A=6.99e-4),
-  r_max=100
+    profile=Plummer(N0=2e6, R0=1.91, A=6.99e-4),
+    r_max=100
 )
 ```
 
