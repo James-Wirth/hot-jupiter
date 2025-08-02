@@ -23,7 +23,7 @@ from hjmodel.config import (
     B_MAX,
     NUM_CPUS,
 )
-from hjmodel import model_utils as default_model_utils
+from hjmodel import core
 from hjmodel.config import CIRCULARISATION_THRESHOLD_ECCENTRICITY, StopCode
 
 logger = logging.getLogger(__name__)
@@ -63,6 +63,9 @@ def _resolve_n_jobs(num_cpus: int) -> int:
 
 
 def _sample_e_init(rng: np.random.Generator) -> float:
+    """
+    The initial eccentricity is sampled from a Rayleigh distribution
+    """
     e_val = -1.0
     F_max = 1 - math.exp(-E_INIT_MAX**2 / (2 * E_INIT_RMS**2))
     while e_val < 0.05:
@@ -72,6 +75,11 @@ def _sample_e_init(rng: np.random.Generator) -> float:
 
 
 def _sample_a_init(rng: np.random.Generator) -> float:
+    """
+    The initial semi-major axis is sampled from a broken power-law
+    distribution (Fernandes et al, 2019).
+    """
+
     def sample_segment(u: float, a1: float, a2: float, alpha: float) -> float:
         if alpha == -1:
             return a1 * (a2 / a1) ** u
@@ -96,6 +104,9 @@ def _sample_a_init(rng: np.random.Generator) -> float:
 
 
 def _sample_m1(rng: np.random.Generator) -> float:
+    """
+    m1 is sampled from the IMF for 47-Tuc due to Giersz and Heggie (2011)
+    """
     y = rng.random()
     return (M_MIN**0.6 * (1 - y) + y * M_BR**0.6) ** (1 / 0.6)
 
@@ -106,6 +117,12 @@ def _sample_m2(_: Optional[np.random.Generator] = None) -> float:
 
 @dataclass
 class PlanetarySystem:
+    """
+    This class encapsulates the initial state and subsequent evolution of a single
+    planetary system, subjected to stochastic kicks due to stellar flybys
+    in a cluster background.
+    """
+
     e_init: float
     a_init: float
     m1: float
@@ -175,14 +192,12 @@ class PlanetarySystem:
         cluster: Cluster,
         total_time: int,
         hybrid_switch: bool = True,
-        max_iters: int = 1_000_000,
-        model_utils_module=None
+        max_iters: int = 1_000_000
     ) -> None:
 
-        mu = model_utils_module if model_utils_module is not None else default_model_utils
         encounter_sampler = EncounterSampler(sigma_v=0.0, rng=self.rng)
 
-        R_td, R_hj, R_wj = mu.get_critical_radii(m1=self.m1, m2=self.m2)
+        R_td, R_hj, R_wj = core.get_critical_radii(m1=self.m1, m2=self.m2)
         t = 0.0
         iterations = 0
 
@@ -198,7 +213,7 @@ class PlanetarySystem:
             encounter_sampler.sigma_v = env["sigma_v"]
 
             wt_time = encounter_sampler.get_waiting_time(env_vars=env)
-            self.e, self.a = mu.tidal_effect(
+            self.e, self.a = core.tidal_effect(
                 e=self.e,
                 a=self.a,
                 m1=self.m1,
@@ -221,10 +236,10 @@ class PlanetarySystem:
                 "m1": self.m1,
                 "m2": self.m2,
             }
-            if mu.is_analytic_valid(**kwargs, sigma_v=env["sigma_v"]) or not hybrid_switch:
-                self.e += mu.de_HR(**kwargs)
+            if core.is_analytic_valid(**kwargs, sigma_v=env["sigma_v"]) or not hybrid_switch:
+                self.e += core.de_HR(**kwargs)
             else:
-                de, da = mu.de_sim(**kwargs)
+                de, da = core.de_sim(**kwargs)
                 self.e += de
                 self.a += da
 
@@ -244,19 +259,17 @@ class PlanetarySystem:
         cluster: Cluster,
         total_time: int,
         hybrid_switch: bool = True,
-        model_utils_module=None
     ) -> Dict[str, float]:
 
         self.evolve(
             cluster=cluster,
             total_time=total_time,
             hybrid_switch=hybrid_switch,
-            model_utils_module=model_utils_module,
         )
-        return self.to_result_dict(cluster=cluster, radius_time=total_time)
+        return self.to_result_dict(cluster=cluster, total_time=total_time)
 
-    def to_result_dict(self, cluster: Cluster, radius_time: float) -> Dict[str, float]:
-        r = cluster.get_radius(lagrange=self.lagrange, t=radius_time)
+    def to_result_dict(self, cluster: Cluster, total_time: float) -> Dict[str, float]:
+        r = cluster.get_radius(lagrange=self.lagrange, t=total_time)
         return {
             "r": r,
             "e_init": self.e_init,
@@ -271,6 +284,11 @@ class PlanetarySystem:
 
 
 class EncounterSampler:
+    """
+    This helper class generates randomized encounter parameters
+    (i.e. orientation, impact parameter, approach speed, perturber mass)
+    """
+
     def __init__(
         self,
         sigma_v: float,
@@ -338,5 +356,4 @@ class EncounterSampler:
         return params
 
     def get_waiting_time(self, env_vars: Dict[str, float]) -> float:
-        perts_per_Myr = default_model_utils.get_perts_per_Myr(*env_vars.values())
-        return self.rng.exponential(1.0 / perts_per_Myr)
+        return self.rng.exponential(1.0 / core.get_perts_per_Myr(*env_vars.values()))
