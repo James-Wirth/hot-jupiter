@@ -106,7 +106,7 @@ class Results:
     def plot_phase_plane(
         self,
         ax: plt.Axes,
-        exclude: Tuple[LabelOrEnum, ...] = ("I",),
+        exclude: Tuple[LabelOrEnum, ...] = ("ION",),
         xrange: Tuple[float, float] = (1e-2, 1e3),
         yrange: Tuple[float, float] = (1, 1e5),
     ) -> None:
@@ -145,7 +145,7 @@ class Results:
     def plot_stopping_cdf(
         self,
         ax: plt.Axes,
-        include: Tuple[LabelOrEnum, ...] = ("I", "TD", "HJ"),
+        include: Tuple[LabelOrEnum, ...] = ("ION", "TD", "HJ"),
         xrange: Tuple[float, float] = (1e-3, 11.99),
         yrange: Tuple[float, float] = (0.01, 1),
     ) -> None:
@@ -163,7 +163,7 @@ class Results:
             x="stopping_time_Gyr",
             hue="stopping_label",
             ax=ax,
-            hue_order=["HJ", "TD", "I"],
+            hue_order=["HJ", "TD", "ION"],
             palette=palette,
             element="step",
             fill=False,

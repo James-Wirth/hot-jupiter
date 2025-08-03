@@ -15,7 +15,7 @@ def test_compute_outcome_probabilities_normalization():
     assert pytest.approx(probs["HJ"], rel=1e-3) == 0.5
     assert pytest.approx(probs["TD"], rel=1e-3) == 0.3
     assert pytest.approx(probs["NM"], rel=1e-3) == 0.2
-    for label in ["I", "WJ"]:
+    for label in ["ION", "WJ"]:
         assert pytest.approx(probs[label], abs=1e-6) == 0.0
 
 
