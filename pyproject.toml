@@ -1,2 +1,18 @@
+[project]
+name = "hot-jupiter"
+version = "0.1.0"
+description = "Monte-Carlo simulations of Hot-Jupiter formation by high-e migration"
+authors = [
+  { name="James Wirth" }
+]
+dependencies = []  # runtime deps can go here if needed
+requires-python = ">=3.8"
+
 [tool.isort]
 profile = "black"
+
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+line-length = 88
