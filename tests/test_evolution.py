@@ -1,9 +1,8 @@
-import numpy as np
 import pytest
 
-from hjmodel.evolution import PlanetarySystem, check_stopping_conditions, EvolutionError
 from hjmodel import core
-from hjmodel.config import StopCode, CIRCULARISATION_THRESHOLD_ECCENTRICITY
+from hjmodel.config import CIRCULARISATION_THRESHOLD_ECCENTRICITY, StopCode
+from hjmodel.evolution import PlanetarySystem, check_stopping_conditions
 
 
 def test_check_stopping_conditions_various():
@@ -15,7 +14,7 @@ def test_check_stopping_conditions_various():
     code = check_stopping_conditions(
         e=1.0, a=10.0, t=0.0, R_td=R_td, R_hj=R_hj, R_wj=R_wj, total_time=total_time
     )
-    assert code == StopCode.I
+    assert code == StopCode.ION
 
     # Tidal disruption
     e = 0.1

@@ -1,30 +1,30 @@
-import math
 import logging
-
-import numpy as np
-
+import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
-from joblib import Parallel, delayed, cpu_count
+
+import numpy as np
+from joblib import Parallel, cpu_count, delayed
 from scipy.optimize import fsolve
 
 from clusters import Cluster
+from hjmodel import core
 from hjmodel.config import (
-    E_INIT_MAX,
-    E_INIT_RMS,
-    A_MIN,
     A_BR,
     A_MAX,
-    s1,
-    s2,
-    M_MIN,
+    A_MIN,
+    B_MAX,
+    CIRCULARISATION_THRESHOLD_ECCENTRICITY,
+    E_INIT_MAX,
+    E_INIT_RMS,
     M_BR,
     M_MAX,
-    B_MAX,
+    M_MIN,
     NUM_CPUS,
+    StopCode,
+    s1,
+    s2,
 )
-from hjmodel import core
-from hjmodel.config import CIRCULARISATION_THRESHOLD_ECCENTRICITY, StopCode
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def check_stopping_conditions(
 ) -> Optional[StopCode]:
 
     if e >= 1:
-        return StopCode.I
+        return StopCode.ION
     if a * (1 - e) < R_td:
         return StopCode.TD
     if a < R_hj and (e <= CIRCULARISATION_THRESHOLD_ECCENTRICITY or t >= total_time):

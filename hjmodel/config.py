@@ -1,5 +1,6 @@
-import numpy as np
 from enum import IntEnum
+
+import numpy as np
 
 ## ---- General constants ----
 G = 4 * np.pi**2  # Gravitational constant / natural units
@@ -58,7 +59,7 @@ class StopCode(IntEnum):
     """
 
     NM = (0, "#D3D3D3")
-    I = (1, "#1b2a49")
+    ION = (1, "#1b2a49")
     TD = (2, "#769EAA")
     HJ = (3, "#D62728")
     WJ = (4, "#FF7F0E")

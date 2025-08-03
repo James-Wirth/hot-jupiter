@@ -1,12 +1,11 @@
 import logging
-
-from typing import Dict, List, Optional, Tuple, Union
 from functools import lru_cache
+from typing import Dict, List, Optional, Tuple, Union
 
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 
 from hjmodel.config import StopCode
 
@@ -39,7 +38,7 @@ class Results:
             )
 
     def _normalize_labels(self, labels: List[LabelOrEnum]) -> Tuple[StopCode, ...]:
-        return tuple(self._normalize_label(l) for l in labels)
+        return tuple(self._normalize_label(lbl) for lbl in labels)
 
     @lru_cache(maxsize=128)
     def _filter_cached(
@@ -51,11 +50,11 @@ class Results:
     ) -> pd.DataFrame:
         df = self.df
         if include:
-            stopcodes = tuple(self._normalize_label(l) for l in include)
+            stopcodes = tuple(self._normalize_label(lbl) for lbl in include)
             codes = [sc.value for sc in stopcodes]
             df = df[df["stopping_condition"].isin(codes)]
         if exclude:
-            stopcodes = tuple(self._normalize_label(l) for l in exclude)
+            stopcodes = tuple(self._normalize_label(lbl) for lbl in exclude)
             codes = [sc.value for sc in stopcodes]
             df = df[~df["stopping_condition"].isin(codes)]
         if r_range:
@@ -70,7 +69,7 @@ class Results:
                 group = df[df["stopping_condition"] == code]
                 parts.append(group.sample(frac=frac, random_state=0))
             excluded_codes = [
-                self._normalize_label(l).value for l in sample_frac.keys()
+                self._normalize_label(lbl).value for lbl in sample_frac.keys()
             ]
             others = df[~df["stopping_condition"].isin(excluded_codes)]
             df = pd.concat(parts + [others], ignore_index=True)
@@ -90,8 +89,8 @@ class Results:
             tuple(
                 sorted(
                     (
-                        (l.name if isinstance(l, StopCode) else l, f)
-                        for l, f in (sample_frac or {}).items()
+                        (lbl.name if isinstance(lbl, StopCode) else lbl, f)
+                        for lbl, f in (sample_frac or {}).items()
                     )
                 )
             )
