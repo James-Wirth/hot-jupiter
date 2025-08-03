@@ -30,11 +30,7 @@ class HJModel:
     (iii) Saving the batched results
     """
 
-    def __init__(
-        self,
-        name: str,
-        base_dir: Path = None
-    ):
+    def __init__(self, name: str, base_dir: Path = None):
 
         if base_dir is None:
             base_dir = Path(__file__).resolve().parent.parent / "data"
@@ -68,8 +64,11 @@ class HJModel:
                 logger.warning("Couldn't read file %s: %s", file, e)
         if dfs:
             concatenated = pd.concat(dfs, ignore_index=True)
-            logger.info("Loaded combined DataFrame with %d rows from %d runs.",
-                        len(concatenated), len(dfs))
+            logger.info(
+                "Loaded combined DataFrame with %d rows from %d runs.",
+                len(concatenated),
+                len(dfs),
+            )
             return concatenated
         else:
             return pd.DataFrame()
@@ -92,13 +91,15 @@ class HJModel:
 
     def _allocate_new_run_dir(self) -> Path:
         existing = [
-            d for d in self.exp_path.iterdir()
+            d
+            for d in self.exp_path.iterdir()
             if d.is_dir() and re.match(r"run_(\d+)$", d.name)
         ]
-        run_indices = sorted([
-            int(re.search(r"\d+", d.name).group())
-            for d in existing
-        ]) if existing else []
+        run_indices = (
+            sorted([int(re.search(r"\d+", d.name).group()) for d in existing])
+            if existing
+            else []
+        )
         next_index = (max(run_indices) + 1) if run_indices else 0
         run_dir = self.exp_path / f"run_{next_index:03d}"
         run_dir.mkdir(parents=True, exist_ok=False)
@@ -112,7 +113,7 @@ class HJModel:
         cluster: Cluster,
         num_batches: int = 10,
         hybrid_switch: bool = True,
-        seed: Optional[int] = None
+        seed: Optional[int] = None,
     ) -> None:
 
         if time < 0:
@@ -128,8 +129,13 @@ class HJModel:
         run_dir = self._allocate_new_run_dir()
         self.path = str(run_dir / "results.parquet")
 
-        logger.info("Evaluating %d systems over %d partitions (t = %s Myr) for experiment %s",
-                    self.num_systems, num_batches, self.time, self.name)
+        logger.info(
+            "Evaluating %d systems over %d partitions (t = %s Myr) for experiment %s",
+            self.num_systems,
+            num_batches,
+            self.time,
+            self.name,
+        )
 
         output_dir = Path(self.path).parent / "parquet_batches"
         if output_dir.exists():
@@ -150,18 +156,24 @@ class HJModel:
 
         try:
             for batch_idx, batch in enumerate(chunked(planetary_systems, batch_size)):
-                logger.info("Processing partition %d/%d", batch_idx + 1, math.ceil(num_systems / batch_size))
+                logger.info(
+                    "Processing partition %d/%d",
+                    batch_idx + 1,
+                    math.ceil(num_systems / batch_size),
+                )
                 results = Parallel(
-                    n_jobs=n_jobs, prefer="processes", batch_size="auto",
+                    n_jobs=n_jobs,
+                    prefer="processes",
+                    batch_size="auto",
                 )(
-                    delayed(PlanetarySystem.run)(
-                        ps, cluster, self.time, hybrid_switch
-                    )
+                    delayed(PlanetarySystem.run)(ps, cluster, self.time, hybrid_switch)
                     for ps in batch
                 )
                 partition_df = pd.DataFrame(results)
                 partition_path = output_dir / f"partition_{batch_idx + 1}.parquet"
-                partition_df.to_parquet(partition_path, engine="pyarrow", compression="snappy")
+                partition_df.to_parquet(
+                    partition_path, engine="pyarrow", compression="snappy"
+                )
                 del results, partition_df
                 gc.collect()
 
@@ -185,9 +197,14 @@ class HJModel:
             try:
                 output_dir.rmdir()
             except Exception:
-                logger.debug("Couldn't remove output directory: %s (might not be empty)", output_dir)
+                logger.debug(
+                    "Couldn't remove output directory: %s (might not be empty)",
+                    output_dir,
+                )
 
         self.invalidate_cache()
 
         if not self.path or not os.path.exists(self.path):
-            raise RuntimeError(f"Expected output file {self.path} not found after run_dynamic.")
+            raise RuntimeError(
+                f"Expected output file {self.path} not found after run_dynamic."
+            )
