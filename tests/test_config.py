@@ -1,4 +1,3 @@
-import pytest
 from hjmodel.config import StopCode
 
 

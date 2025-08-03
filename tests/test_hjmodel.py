@@ -1,6 +1,4 @@
-import os
 import pandas as pd
-import pytest
 
 from hjmodel.__init__ import HJModel
 from hjmodel.config import StopCode

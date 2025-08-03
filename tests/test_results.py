@@ -1,8 +1,8 @@
 import pandas as pd
 import pytest
 
-from hjmodel.results import Results
 from hjmodel.config import StopCode
+from hjmodel.results import Results
 
 
 def test_compute_outcome_probabilities_normalization():

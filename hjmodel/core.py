@@ -1,24 +1,23 @@
 import logging
-import rebound
-
-import numpy as np
-
-from scipy.optimize import fsolve
 from typing import Tuple
 
+import numpy as np
+import rebound
+from scipy.optimize import fsolve
+
 from hjmodel.config import (
-    G,
-    XI,
-    INIT_PHASES,
-    T_MIN,
-    S_MIN,
-    K_P,
-    TAU_P,
-    R_P,
-    ETA,
     B_MAX,
+    ETA,
+    INIT_PHASES,
+    K_P,
     MAX_HJ_PERIOD,
     MAX_WJ_PERIOD,
+    R_P,
+    S_MIN,
+    T_MIN,
+    TAU_P,
+    XI,
+    G,
 )
 
 _MEAN_ANOMS_GRID = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)

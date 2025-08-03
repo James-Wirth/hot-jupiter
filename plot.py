@@ -3,9 +3,9 @@ import copy
 import logging
 from pathlib import Path
 
+import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
-import matplotlib.lines as mlines
 
 from hjmodel import HJModel
 from hjmodel.results import Results
@@ -213,8 +213,8 @@ def print_outcome_probabilities(name: str):
 def main():
     # e.g.
     EXPERIMENT = "EXAMPLE"
-    DISABLE_TEX = True
-    STYLE = "mnras"
+    # DISABLE_TEX = True
+    # STYLE = "mnras"
 
     print_outcome_probabilities(EXPERIMENT)
     # stopping_time_fig(EXPERIMENT, style=STYLE, disable_tex=DISABLE_TEX)
