@@ -1,0 +1,8 @@
+pytest
+pytest-cov
+pyarrow
+dask
+black
+isort
+ruff
+pre-commit
