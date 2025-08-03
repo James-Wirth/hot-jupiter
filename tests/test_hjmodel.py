@@ -5,6 +5,7 @@ import pytest
 from hjmodel.__init__ import HJModel
 from hjmodel.config import StopCode
 
+
 def test_caching_and_invalidation(tmp_path):
     base_dir = tmp_path / "data"
     exp_name = "exp1"
@@ -24,6 +25,7 @@ def test_caching_and_invalidation(tmp_path):
     pd.testing.assert_frame_equal(df1, df2)
     assert df2 is not df1
 
+
 def test_allocate_new_run_dir_increments(tmp_path):
     base_dir = tmp_path / "data"
     model = HJModel(name="exp2", base_dir=base_dir)
@@ -32,6 +34,7 @@ def test_allocate_new_run_dir_increments(tmp_path):
     next_dir = model._allocate_new_run_dir()
     assert next_dir.name == "run_002"
     assert next_dir.exists()
+
 
 def test_hjmodel_run_output_structure(tmp_path, monkeypatch, dummy_cluster):
     from hjmodel.evolution import PlanetarySystem
@@ -52,9 +55,26 @@ def test_hjmodel_run_output_structure(tmp_path, monkeypatch, dummy_cluster):
     monkeypatch.setattr(PlanetarySystem, "run", fake_run)
 
     model = HJModel(name="exp_run", base_dir=tmp_path / "data")
-    model.run(time=5, num_systems=2, cluster=dummy_cluster, num_batches=1, hybrid_switch=True, seed=42)
+    model.run(
+        time=5,
+        num_systems=2,
+        cluster=dummy_cluster,
+        num_batches=1,
+        hybrid_switch=True,
+        seed=42,
+    )
     df = model.results.df
-    expected_cols = {"r", "e_init", "a_init", "m1", "m2", "final_e", "final_a", "stopping_condition", "stopping_time"}
+    expected_cols = {
+        "r",
+        "e_init",
+        "a_init",
+        "m1",
+        "m2",
+        "final_e",
+        "final_a",
+        "stopping_condition",
+        "stopping_time",
+    }
     assert expected_cols.issubset(set(df.columns))
     assert len(df) == 2
     assert set(df["stopping_condition"].unique()) == {StopCode.HJ.value}

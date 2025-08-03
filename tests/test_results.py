@@ -18,10 +18,13 @@ def test_compute_outcome_probabilities_normalization():
     for label in ["I", "WJ"]:
         assert pytest.approx(probs[label], abs=1e-6) == 0.0
 
+
 def test_filter_and_sample_frac_consistency():
     hj_rows = [{"r": 1.0, "stopping_condition": StopCode.HJ.value}] * 10
     nm_rows = [{"r": 1.0, "stopping_condition": StopCode.NM.value}] * 90
     df = pd.DataFrame(hj_rows + nm_rows)
     results = Results(df)
     filtered = results.filter_outcomes(include=["HJ"], sample_frac={"NM": 0.5})
-    assert all(filtered["stopping_condition"].isin([StopCode.HJ.value, StopCode.NM.value]))
+    assert all(
+        filtered["stopping_condition"].isin([StopCode.HJ.value, StopCode.NM.value])
+    )

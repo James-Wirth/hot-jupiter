@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+
 class DummyCluster:
     def get_lagrange_distribution(self, n_samples: int, t: float):
         return np.ones(n_samples) * 1.0
@@ -15,9 +16,11 @@ class DummyCluster:
             "local_sigma_v": 1.0,
         }
 
+
 @pytest.fixture
 def dummy_cluster():
     return DummyCluster()
+
 
 @pytest.fixture
 def rng():

@@ -34,18 +34,20 @@ class Results:
         try:
             return StopCode.from_name(label)
         except ValueError:
-            raise ValueError(f"Invalid outcome label: {label}. Valid keys: {self.valid_labels}")
+            raise ValueError(
+                f"Invalid outcome label: {label}. Valid keys: {self.valid_labels}"
+            )
 
     def _normalize_labels(self, labels: List[LabelOrEnum]) -> Tuple[StopCode, ...]:
         return tuple(self._normalize_label(l) for l in labels)
 
     @lru_cache(maxsize=128)
     def _filter_cached(
-            self,
-            include: Optional[Tuple[LabelOrEnum, ...]],
-            exclude: Optional[Tuple[LabelOrEnum, ...]],
-            sample_frac_items: Optional[Tuple[Tuple[str, float], ...]],
-            r_range: Optional[Tuple[float, float]]
+        self,
+        include: Optional[Tuple[LabelOrEnum, ...]],
+        exclude: Optional[Tuple[LabelOrEnum, ...]],
+        sample_frac_items: Optional[Tuple[Tuple[str, float], ...]],
+        r_range: Optional[Tuple[float, float]],
     ) -> pd.DataFrame:
         df = self.df
         if include:
@@ -67,23 +69,35 @@ class Results:
                 code = sc.value
                 group = df[df["stopping_condition"] == code]
                 parts.append(group.sample(frac=frac, random_state=0))
-            excluded_codes = [self._normalize_label(l).value for l in sample_frac.keys()]
+            excluded_codes = [
+                self._normalize_label(l).value for l in sample_frac.keys()
+            ]
             others = df[~df["stopping_condition"].isin(excluded_codes)]
             df = pd.concat(parts + [others], ignore_index=True)
         return df.copy()
 
     def filter_outcomes(
-            self,
-            include: Optional[List[LabelOrEnum]] = None,
-            exclude: Optional[List[LabelOrEnum]] = None,
-            sample_frac: Optional[Dict[LabelOrEnum, float]] = None,
-            r_range: Optional[Tuple[float, float]] = None
+        self,
+        include: Optional[List[LabelOrEnum]] = None,
+        exclude: Optional[List[LabelOrEnum]] = None,
+        sample_frac: Optional[Dict[LabelOrEnum, float]] = None,
+        r_range: Optional[Tuple[float, float]] = None,
     ) -> pd.DataFrame:
 
         include_key = tuple(include) if include else None
         exclude_key = tuple(exclude) if exclude else None
-        sample_frac_items = tuple(sorted(((l.name if isinstance(l, StopCode) else l, f) for l, f in
-                                          (sample_frac or {}).items()))) if sample_frac else None
+        sample_frac_items = (
+            tuple(
+                sorted(
+                    (
+                        (l.name if isinstance(l, StopCode) else l, f)
+                        for l, f in (sample_frac or {}).items()
+                    )
+                )
+            )
+            if sample_frac
+            else None
+        )
         return self._filter_cached(include_key, exclude_key, sample_frac_items, r_range)
 
     def _cmap(self) -> mcolors.ListedColormap:
@@ -98,12 +112,8 @@ class Results:
         yrange: Tuple[float, float] = (1, 1e5),
     ) -> None:
 
-        df = (
-            self.filter_outcomes(exclude=list(exclude))
-            .assign(
-                x=lambda d: d["final_a"],
-                y=lambda d: 1 / (1 - d["final_e"])
-            )
+        df = self.filter_outcomes(exclude=list(exclude)).assign(
+            x=lambda d: d["final_a"], y=lambda d: 1 / (1 - d["final_e"])
         )
         cmap = self._cmap()
         ax.scatter(
@@ -142,12 +152,9 @@ class Results:
     ) -> None:
         import seaborn as sns
 
-        df = (
-            self.filter_outcomes(include=list(include))
-            .assign(
-                stopping_time_Gyr=lambda d: d["stopping_time"] / 1e3,
-                stopping_label=lambda d: d["stopping_condition"].map(self.id2label),
-            )
+        df = self.filter_outcomes(include=list(include)).assign(
+            stopping_time_Gyr=lambda d: d["stopping_time"] / 1e3,
+            stopping_label=lambda d: d["stopping_condition"].map(self.id2label),
         )
         bins = np.logspace(np.log10(xrange[0]), np.log10(xrange[1]), 1000)
         palette = {sc.name: sc.hex for sc in StopCode}
@@ -185,7 +192,9 @@ class Results:
     ) -> None:
         import seaborn as sns
 
-        df = self.filter_outcomes(include=list(conditions), sample_frac={"NM": 1 - drop_frac})
+        df = self.filter_outcomes(
+            include=list(conditions), sample_frac={"NM": 1 - drop_frac}
+        )
         for cond in conditions:
             sc = self._normalize_label(cond)
             code = sc.value
@@ -217,7 +226,9 @@ class Results:
         yrange: Tuple[float, float] = (0.01, 100),
     ) -> None:
 
-        df = self.filter_outcomes(include=list(conditions), sample_frac={"NM": 1 - drop_frac})
+        df = self.filter_outcomes(
+            include=list(conditions), sample_frac={"NM": 1 - drop_frac}
+        )
         for z, cond in enumerate(conditions):
             sc = self._normalize_label(cond)
             code = sc.value
@@ -272,12 +283,16 @@ class Results:
 
         stopcodes = self._normalize_labels(outcomes)
         codes = [sc.value for sc in stopcodes]
-        df = self.df[(self.df["stopping_condition"].isin(codes)) & (self.df["r"] <= r_max)]
+        df = self.df[
+            (self.df["stopping_condition"].isin(codes)) & (self.df["r"] <= r_max)
+        ]
         return df[feature].tolist()
 
     def project_radius(self, random_seed: Optional[int] = None) -> None:
         rng = np.random.default_rng(random_seed)
-        self.df = self.df.assign(r_proj=lambda d: d["r"] * np.sin(rng.random(d.shape[0]) * 2 * np.pi))
+        self.df = self.df.assign(
+            r_proj=lambda d: d["r"] * np.sin(rng.random(d.shape[0]) * 2 * np.pi)
+        )
 
     def radius_histogram(
         self,
@@ -298,15 +313,16 @@ class Results:
         counts = binned.value_counts()
         valid_bins = counts[counts > min_counts].index
         if valid_bins.empty:
-            logger.warning("[radius_histogram] no bins exceed min_counts=%d", min_counts)
+            logger.warning(
+                "[radius_histogram] no bins exceed min_counts=%d", min_counts
+            )
             empty = pd.Series(dtype=float)
             return empty, 0.0, 0.0
 
         filtered = self.df.loc[binned.isin(valid_bins)].copy()
-        grouped = (
-            filtered.groupby(pd.cut(filtered[label].abs(), bin_edges))["stopping_condition"]
-            .value_counts(normalize=True)
-        )
+        grouped = filtered.groupby(pd.cut(filtered[label].abs(), bin_edges))[
+            "stopping_condition"
+        ].value_counts(normalize=True)
         if grouped.empty:
             return grouped, 0.0, 0.0
         lefts = [interval.left for interval in grouped.index.get_level_values(0)]

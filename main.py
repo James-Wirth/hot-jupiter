@@ -7,36 +7,40 @@ from hjmodel import HJModel
 
 NAME = "EXAMPLE"
 TIME = 12000  # in Myr
-NUM_SYSTEMS = 5000
-HYBRID_SWITCH = False
+NUM_SYSTEMS = 10000
+HYBRID_SWITCH = True
 SEED = 42
 R_MAX = 100  # in parsecs
 
 # directory where data/<<RESULTS_PATH>>/results.parquet will be stored
 BASE_DIR = Path(__file__).resolve().parent / "data"
 
+
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s"
+    )
     logger = logging.getLogger(__name__)
 
     logger.info("Starting experiment: '%s'", NAME)
 
-    cluster = Cluster(
-        profile=Plummer(N0=2e6, R0=1.91, A=6.991e-4),
-        r_max=R_MAX
-    )
+    cluster = Cluster(profile=Plummer(N0=2e6, R0=1.91, A=6.991e-4), r_max=R_MAX)
 
     model = HJModel(name=NAME, base_dir=BASE_DIR)
     logger.info(
         "Running simulation: name=%s time=%s num_systems=%s seed=%s hybrid_switch=%s",
-        NAME, TIME, NUM_SYSTEMS, SEED, HYBRID_SWITCH
+        NAME,
+        TIME,
+        NUM_SYSTEMS,
+        SEED,
+        HYBRID_SWITCH,
     )
     model.run(
         time=TIME,
         num_systems=NUM_SYSTEMS,
         cluster=cluster,
         hybrid_switch=HYBRID_SWITCH,
-        seed=SEED
+        seed=SEED,
     )
 
     results = model.results
