@@ -27,7 +27,7 @@ jobs:
         run: |
           black --check .
           isort --check-only .
-          ruff .
+          ruff check .
 
       - name: Run tests with coverage
         run: |
