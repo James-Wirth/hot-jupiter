@@ -4,9 +4,9 @@
 ![CI](https://github.com/James-Wirth/hot-jupiter/actions/workflows/ci.yml/badge.svg)
 
 
-**HotJupiter** is a Monte-Carlo simulation package for studying Hot Jupiter formation in dense globular clusters via high-e migration. We have used the [REBOUND](https://github.com/hannorein/rebound) code with the IAS15 numerical integrator to simulate the dynamical evolution of planetary systems due to stellar perturbation over Gyr timescales.
+**HotJupiter** is a Monte-Carlo simulation package for studying Hot Jupiter formation in dense globular clusters via high-eccentricity migration. We have used the [REBOUND](https://github.com/hannorein/rebound) code with the IAS15 numerical integrator to simulate the dynamical evolution of planetary systems due to stellar perturbation over Gyr timescales.
 
-We study Hot Jupiter formation by high-eccentricity migration. Stellar flybys perturb the orbit of the progenitor planetary system, causing the orbit to undergo a random walk in eccentricity space. Analytic expressions for the eccentricity excitation were derived by [Heggie & Rasio (1996), *The effect of encounters on the eccentricity of binaries in clusters*](https://doi.org/10.1093/mnras/282.3.1064), but these hold only in the tidal and slow regime, neglecting terms higher than quadrupole in the multipole expansion. We have introduced an efficient hybrid scheme for computing the eccentricity diffusion, whereby direct N-body simulations of the encounter are performed only in regimes where the analytic expressions are invalid. 
+Stellar flybys perturb the orbit of the progenitor planetary system, causing the orbit to undergo a random walk in eccentricity space. Analytic expressions for the eccentricity excitation were derived by [Heggie & Rasio (1996), *The effect of encounters on the eccentricity of binaries in clusters*](https://doi.org/10.1093/mnras/282.3.1064), but these hold only in the tidal and slow regime, neglecting terms higher than quadrupole in the multipole expansion. We have introduced an efficient hybrid scheme for computing the eccentricity diffusion, whereby direct N-body simulations of the encounter are performed only in regimes where the analytic expressions are invalid. 
 
 <br>
 <p align="center">
