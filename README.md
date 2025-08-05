@@ -6,16 +6,17 @@
 
 **HotJupiter** is a Monte-Carlo simulation package for studying Hot Jupiter formation in dense globular clusters via high-e migration. We have used the [REBOUND](https://github.com/hannorein/rebound) code with the IAS15 numerical integrator to simulate the dynamical evolution of planetary systems due to stellar perturbation over Gyr timescales.
 
-The final states of planetary systems are categorized into five unique outcomes:
+We study Hot Jupiter formation by high-eccentricity migration. Stellar flybys perturb the orbit of the progenitor planetary system, causing the orbit to undergo a random walk in eccentricity space. Analytic expressions for the eccentricity excitation were derived by [Heggie & Rasio (1996), *The effect of encounters on the eccentricity of binaries in clusters*](https://doi.org/10.1093/mnras/282.3.1064), but these hold only in the tidal and slow regime, neglecting terms higher than quadrupole in the multipole expansion. We have introduced an efficient hybrid scheme for computing the eccentricity diffusion, whereby direct N-body simulations of the encounter are performed only in regimes where the analytic expressions are invalid. 
 
-| Category            | Description                                                     |
-|---------------------|-----------------------------------------------------------------|
-| **Ionisation**      | Unbound systems with $e > 1$                                   |
-| **Tidal Disruption**| Systems disrupted if $r(t) < R_{\mathrm{td}}$ at any time $t$  |
-| **Hot Jupiter**     | Systems with orbital periods $T < 10 \ \mathrm{days}$          |
-| **Warm Jupiter**    | Systems with orbital periods $10 < T < 100 \ \mathrm{days}$    |
-| **No Migration**    | Systems that do not fall into the above categories             |
+<br>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/d5dca9fb-6ca3-4f38-abb6-51dede180ddf" alt="Simulation Results" width="80%" />
+  <br />
+  <em>Simulation Results for 47 Tuc</em>
+</p>
+<br>
 
+The final states of planetary systems are categorized into five unique outcomes: Ionisation (I), Tidal Disruption (TD), Hot Jupiter formation (HJ), Warm Jupiter formation (WJ) and No Migration (NM).
 
 ## Installation
 
@@ -42,7 +43,7 @@ cluster = Cluster(
 )
 ```
 
-To run a simulation, use the provided driver script in `main.py`. You can customize the run directly:
+For guidance on running a simulation, see the provided driver script in `main.py`. You can customize the run directly:
 
 ```python
 from hjmodel import HJModel
@@ -57,12 +58,14 @@ model.run(
 )
 ```
 
+where `TIME` is the simulation duration in Megayears, `NUM_SYSTEMS` is the number of Monte-Carlo ensembles, `cluster` is the `Cluster` instance defined above, `hybrid_switch` is the boolean flag that turns on/off the hybrid mode, and `seed` is the seed for random number generation (included for reproducibility). 
+
 This generates:
 
 - A results file: `<BASE_DIR>/NAME/run_XXX/results.parquet`
 - A summary report `<BASE_DIR>/NAME/run_XXX/summary.txt`
 
-Multiple runs with the same name are stored under auto-incrementing run_XXX identifiers. 
+Multiple runs with the same name are stored under auto-incrementing `run_XXX` identifiers, for optional manual batching. 
 When acessing `model.results` (see next section), data from all runs are automatically aggregated.
 
 ## Results
@@ -85,8 +88,8 @@ The `results` object includes built-in methods for generating key plots:
 |-----------------------------|----------------------------------------|
 | `plot_phase_plane(ax)`      | Phase space: $a$ vs $1/(1-e)$          |
 | `plot_stopping_cdf(ax)`     | CDF of stopping times                  |
-| `plot_sma_distribution(ax)` | Final $a$ distribution                 |
-| `plot_sma_scatter(ax)`      | Final $a$ vs cluster radius            |
+| `plot_sma_distribution(ax)` | Final SMA distribution                 |
+| `plot_sma_scatter(ax)`      | Final SMA vs cluster radius            |
 | `plot_projected_probability(ax)` | Projected radial outcome probabilities |
 
 **Usage pattern:**
