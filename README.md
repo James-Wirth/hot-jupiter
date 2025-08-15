@@ -10,11 +10,12 @@ The eccentricity of a planetary system can be perturbed by stellar flybys. At su
 
 <br>
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/d5dca9fb-6ca3-4f38-abb6-51dede180ddf" alt="Simulation Results" width="80%" />
+  <img src="https://github.com/user-attachments/files/21801314/show_paths_mnras.pdf" alt="Simulation Results" width="80%" />
   <br />
-  <em>Simulation Results for 47 Tuc</em>
+  <em>Example: The phase-space paths for a sample of Hot Jupiter (HJ), Warm Jupiter (WJ), Tidal Disruption (TD) and No-Migration (NM) outcomes. </em>
 </p>
 <br>
+
 
 The final states of planetary systems are categorized into five unique outcomes: Ionisation (I), Tidal Disruption (TD), Hot Jupiter formation (HJ), Warm Jupiter formation (WJ) and No Migration (NM).
 
