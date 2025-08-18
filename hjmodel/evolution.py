@@ -5,7 +5,6 @@ from typing import Dict, List, Optional
 
 import numpy as np
 from joblib import Parallel, cpu_count, delayed
-from scipy.optimize import fsolve
 
 from clusters import Cluster
 from hjmodel import core
@@ -302,28 +301,13 @@ class EncounterSampler:
         return math.sqrt(self.rng.random() * self.override_b_max**2)
 
     def sample_v_infty(self) -> float:
-        y = self.rng.random()
-        sigma_rel = self.sigma_v * math.sqrt(2)
+        sigma_rel = self.sigma_v * math.sqrt(2.0)
+        if not np.isfinite(sigma_rel) or sigma_rel <= 0.0:
+            return float(self.sigma_v)
 
-        def cdf(x: float) -> float:
-            return math.erf(x / (math.sqrt(2) * sigma_rel)) - (math.sqrt(2) * x) / (
-                math.sqrt(math.pi) * sigma_rel
-            ) * math.exp(-(x**2) / (2 * sigma_rel**2))
-
-        initial = math.sqrt(2) * self.sigma_v
-        ans, infodict, ier, mesg = fsolve(
-            lambda x: cdf(x) - y, initial, full_output=True
-        )
-        result = ans[0] if isinstance(ans, (list, np.ndarray)) else ans
-        if ier != 1 or not np.isfinite(result) or result < 0:
-            logger.warning(
-                "v_infty root finding did not converge (ier=%s)! Fallback to sigma_v=%s; message=%s",
-                ier,
-                self.sigma_v,
-                mesg,
-            )
-            return self.sigma_v
-        return result
+        x, y, z = self.rng.normal(0.0, sigma_rel, size=3)
+        v = math.sqrt(x * x + y * y + z * z)
+        return float(v)
 
     def sample_orientation(self) -> Dict[str, float]:
         return {
