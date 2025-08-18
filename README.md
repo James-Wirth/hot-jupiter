@@ -83,17 +83,7 @@ The outcome probabilities can be accessed via:
 results.compute_outcome_probabilities(r_range=(R_MIN, R_MAX))
 ```
 
-The `results` object includes built-in methods for generating key plots:
-
-| Method                       | Description                            |
-|-----------------------------|----------------------------------------|
-| `plot_phase_plane(ax)`      | Phase space: $a$ vs $1/(1-e)$          |
-| `plot_stopping_cdf(ax)`     | CDF of stopping times                  |
-| `plot_sma_distribution(ax)` | Final SMA distribution                 |
-| `plot_sma_scatter(ax)`      | Final SMA vs cluster radius            |
-| `plot_projected_probability(ax)` | Projected radial outcome probabilities |
-
-**Usage pattern:**
+The `results` object includes built-in methods for generating key plots, e.g.:
 
 ```python
 import matplotlib.pyplot as plt
@@ -101,3 +91,4 @@ import matplotlib.pyplot as plt
 fig, ax = plt.subplots()
 results.plot_phase_plane(ax)
 plt.show()
+```
