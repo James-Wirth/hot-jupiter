@@ -1,6 +1,7 @@
 import logging
 from typing import Tuple
 
+import numba
 import numpy as np
 import rebound
 from scipy.optimize import fsolve
@@ -195,16 +196,27 @@ def is_analytic_valid(
     )
 
 
+@numba.njit(cache=True, fastmath=True)
 def f(e: float) -> float:
-    """
-    Helper function for the tidal circularization calculations
-    """
-    num_coeffs = np.array([1, 45 / 14, 8, 685 / 224, 255 / 488, 25 / 1792])
-    denom_coeffs = np.array([1, 3, 3 / 8])
-    vec = np.array([e ** (2 * i) for i in range(6)])
-    return np.dot(num_coeffs, vec) / np.dot(denom_coeffs, vec[:3])
+    e2 = e * e
+    e4 = e2 * e2
+    e6 = e4 * e2
+    e8 = e4 * e4
+    e10 = e8 * e2
+
+    num = (
+        1.0
+        + (45.0 / 14.0) * e2
+        + 8.0 * e4
+        + (685.0 / 224.0) * e6
+        + (255.0 / 488.0) * e8
+        + (25.0 / 1792.0) * e10
+    )
+    denom = 1.0 + 3.0 * e2 + (3.0 / 8.0) * e4
+    return num / denom
 
 
+@numba.njit(cache=True, fastmath=True)
 def de_tid_dt(e: float, a: float, m1: float, m2: float) -> float:
     """
     de/dt for tidal circularization (in Myr^-1)
@@ -226,6 +238,7 @@ def de_tid_dt(e: float, a: float, m1: float, m2: float) -> float:
     return e_dot_tide
 
 
+@numba.njit(cache=True, fastmath=True)
 def da_tid_dt(e: float, a: float, m1: float, m2: float) -> float:
     """
     da/dt for tidal circularization (in Myr^-1)
@@ -246,6 +259,7 @@ def da_tid_dt(e: float, a: float, m1: float, m2: float) -> float:
     return a_dot_tide
 
 
+@numba.njit(cache=True, fastmath=True)
 def get_dn(
     dedn: float, dadn: float, e: float, a: float, C: float, n_cum: float
 ) -> float:
@@ -255,6 +269,7 @@ def get_dn(
     return min(1 - n_cum, C / max(np.abs(dedn) / e, np.abs(dadn) / a))
 
 
+@numba.njit(cache=True, fastmath=True)
 def tidal_effect(
     e: float, a: float, m1: float, m2: float, time_in_Myr: float, C: float = 0.01
 ) -> Tuple[float, float]:
