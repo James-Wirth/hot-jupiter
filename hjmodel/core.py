@@ -1,10 +1,10 @@
 import logging
 import math
-from typing import Tuple
+from collections import namedtuple
 
-import numba
 import numpy as np
 import rebound
+from numba import njit
 
 from hjmodel.config import (
     B_MAX,
@@ -21,12 +21,35 @@ from hjmodel.config import (
     G,
 )
 
+# ############################
+# Named tuples for cleaner return types
+# ############################
+
+SimResult = namedtuple("SimResult", ["delta_e_sim", "delta_a_sim"])
+
+PerturbingOrbitParams = namedtuple("PerturbingOrbitParams", ["a_pert", "e_pert", "rp"])
+IntegrationParams = namedtuple("IntegrationParams", ["t_int", "f0"])
+TidalEffectResult = namedtuple("TidalEffectResult", ["e", "a"])
+CriticalRadii = namedtuple("CriticalRadii", ["R_td", "R_hj", "R_wj"])
+
+# ############################
+# Constants
+# ############################
+
 _MEAN_ANOMS_GRID = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)
+_EPS16 = 1e-16
+_EPS15 = 1e-15
+_EPS14 = 1e-14
 
 logger = logging.getLogger(__name__)
 
 
-@numba.njit(cache=True, fastmath=True, inline="always")
+# ############################
+# Solving the Kepler equation
+# ############################
+
+
+@njit(cache=True, fastmath=True, inline="always")
 def _make_canonical_angle(x: float) -> float:
     twopi = 2.0 * math.pi
     x = (x + math.pi) % twopi
@@ -35,7 +58,7 @@ def _make_canonical_angle(x: float) -> float:
     return x - math.pi
 
 
-@numba.njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True)
 def _solve_kepler_E(M: float, e: float) -> float:
     """
     Halley's method for solving the Kepler equation
@@ -48,59 +71,64 @@ def _solve_kepler_E(M: float, e: float) -> float:
         sE = math.sin(E)
         f = E - e * sE - M
         f1 = 1.0 - e * c
-        if abs(f1) < 1e-15:
+        if abs(f1) < _EPS15:
             E -= f
             continue
         r = f / f1
         denom = f1 - 0.5 * (e * sE) * r + (1.0 / 6.0) * (e * c) * r * r
-        E -= (f / denom) if abs(denom) > 1e-15 else r
-        if abs(f) < 1e-14:
+        E -= (f / denom) if abs(denom) > _EPS15 else r
+        if abs(f) < _EPS14:
             break
     return E
 
 
-@numba.njit(cache=True, fastmath=True, inline="always")
+@njit(cache=True, fastmath=True, inline="always")
 def _make_true_anomaly_from_E(E: float, e: float) -> float:
     cE = math.cos(E)
     sE = math.sin(E)
     denom = 1.0 - e * cE
-    if abs(denom) < 1e-15:
-        denom = 1e-15 if denom >= 0.0 else -1e-15
+    if abs(denom) < _EPS15:
+        denom = _EPS15 if denom >= 0.0 else -_EPS15
     sf = math.sqrt(max(0.0, 1.0 - e * e)) * sE / denom
     cf = (cE - e) / denom
     return _make_canonical_angle(math.atan2(sf, cf))
 
 
-@numba.njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True)
 def convert_mean_to_true_anomaly(mean_anom: float, e: float) -> float:
     E = _solve_kepler_E(mean_anom, e)
     return _make_true_anomaly_from_E(E, e)
 
 
-@numba.njit(cache=True, fastmath=True)
+# ############################
+# Orbital parameters of the perturber
+# ############################
+
+
+@njit(cache=True, fastmath=True)
 def compute_perturbing_orbit_params(
     v_infty: float, b: float, m1: float, m2: float
-) -> Tuple[float, float, float]:
+) -> PerturbingOrbitParams:
     """
-    Calculate a_pert, e_pert and r_p for the perturbing orbit,
-    given the encounter parameters
+    Orbital parameters (a_pert, e_pert and r_p) for the perturber
     """
+    _MIN_VINF = 1e-12
     if v_infty <= 0.0 or not math.isfinite(v_infty):
-        v_infty = 1e-12
+        v_infty = _MIN_VINF
 
     a_pert = -G * (m1 + m2) / (v_infty * v_infty)
     e_pert = math.sqrt(1.0 + (b / a_pert) ** 2)
     rp = -a_pert * (e_pert - 1.0)
-    return a_pert, e_pert, rp
+
+    return PerturbingOrbitParams(a_pert, e_pert, rp)
 
 
-@numba.njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True)
 def compute_integration_params(
     a_pert: float, e_pert: float, rp: float
-) -> Tuple[float, float]:
+) -> IntegrationParams:
     """
-    Calculate the integration time (t_int) as well as the initial true anomaly (-f0)
-    for the perturbing orbit.
+    Integration time (t_int) and initial true anomaly (-f0) for the perturbing orbit
     """
     max_anomaly = math.acos(-1.0 / e_pert)
     r_crit = rp / (XI ** (1.0 / 3.0))
@@ -121,11 +149,15 @@ def compute_integration_params(
     F = math.acosh(arg)
     t = (e_pert * math.sinh(F) - F) * (-a_pert) ** 1.5
 
-    # t_int, -f0
-    return 2.0 * t, -alpha * max_anomaly
+    return IntegrationParams(2.0 * t, -alpha * max_anomaly)
 
 
-@numba.njit(cache=True, fastmath=True)
+# ############################
+# Eccentricity excitation models
+# ############################
+
+
+@njit(cache=True, fastmath=True)
 def de_hr(
     v_infty: float,
     b: float,
@@ -139,22 +171,26 @@ def de_hr(
     m3: float,
 ) -> float:
     """
-    Calculates the eccentricity excitation using the Heggie-Rasio (1986) approximation
+    Eccentricity excitation via Heggie-Rasio (1986) approximation
     """
-
     m123 = m1 + m2 + m3
-    a_pert, e_pert, rp = compute_perturbing_orbit_params(v_infty, b, m1, m2)
+    params = compute_perturbing_orbit_params(v_infty, b, m1, m2)
 
     y = e * math.sqrt(max(0.0, 1.0 - e * e)) * (m3 / math.sqrt((m1 + m2) * m123))
-    alpha = -1 * (15 / 4) * ((1 + e_pert) ** (-3 / 2))
-    chi = math.acos(-1 / e_pert) + math.sqrt(e_pert**2 - 1)
-    psi = (1 / 3) * (((e_pert**2 - 1) ** (3 / 2)) / (e_pert**2))
+    alpha = -1 * (15 / 4) * ((1 + params.e_pert) ** (-3 / 2))
+    chi = math.acos(-1 / params.e_pert) + math.sqrt(params.e_pert**2 - 1)
+    psi = (1 / 3) * (((params.e_pert**2 - 1) ** (3 / 2)) / (params.e_pert**2))
 
     Theta1 = (math.sin(inc) ** 2) * math.sin(2 * Omega)
     Theta2 = (1 + (math.cos(inc)) ** 2) * math.cos(2 * omega) * math.sin(2 * Omega)
     Theta3 = 2 * math.cos(inc) * math.sin(2 * omega) * math.cos(2 * Omega)
 
-    return alpha * y * ((a / rp) ** (3 / 2)) * (Theta1 * chi + (Theta2 + Theta3) * psi)
+    return (
+        alpha
+        * y
+        * ((a / params.rp) ** (3 / 2))
+        * (Theta1 * chi + (Theta2 + Theta3) * psi)
+    )
 
 
 def de_sim(
@@ -168,13 +204,10 @@ def de_sim(
     m1: float,
     m2: float,
     m3: float,
-) -> Tuple[float, float]:
+) -> SimResult:
     """
-    Calculates the eccentricity excitation using the REBOUND code
-    with full N-body integration
+    Eccentricity excitation via full N-body integration (REBOUND)
     """
-
-    # calculate orbital parameters of perturbing trajectory
     a_pert, e_pert, rp = compute_perturbing_orbit_params(
         v_infty=v_infty, b=b, m1=m1, m2=m2
     )
@@ -183,7 +216,6 @@ def de_sim(
     idx = np.random.randint(_MEAN_ANOMS_GRID.size)
     f_phase = convert_mean_to_true_anomaly(float(_MEAN_ANOMS_GRID[idx]), e)
 
-    # configure REBOUND simulation
     sim = rebound.Simulation()
     sim.add(m=m1)
     sim.add(m=m2, a=a, e=e, f=f_phase)
@@ -191,27 +223,36 @@ def de_sim(
     sim.move_to_com()
     sim.integrate(t_int)
 
-    # calculate final orbital parameters of planetary system
     o_binary = sim.particles[1].orbit()
     delta_e_sim = o_binary.e - e
     delta_a_sim = o_binary.a - a
 
-    # deallocate simulation from memory
     sim = None
-    return delta_e_sim, delta_a_sim
+    return SimResult(delta_e_sim, delta_a_sim)
 
 
-@numba.njit(cache=True, fastmath=True)
+# ############################
+# Tidal circularization theory
+# ############################
+
+
+@njit(cache=True, fastmath=True)
 def tidal_param(v_infty: float, b: float, a: float, m1: float, m2: float) -> float:
-    _, _, rp = compute_perturbing_orbit_params(v_infty, b, m1, m2)
-    return rp / a
+    """
+    Tidal parameter := (pericenter radius of perturbing orbit) / (semi-major of planetary orbit)
+    """
+    params = compute_perturbing_orbit_params(v_infty=v_infty, b=b, m1=m1, m2=m2)
+    return params.rp / a
 
 
-@numba.njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True)
 def slow_param(v_infty: float, b: float, a: float, m1: float, m2: float) -> float:
-    a_pert, e_pert, rp = compute_perturbing_orbit_params(v_infty, b, m1, m2)
-    t_int, _ = compute_integration_params(a_pert=a_pert, e_pert=e_pert, rp=rp)
-    t_per = (a**3 / (m1 + m2)) ** (1 / 2)
+    """
+    Slow parameter := (integration time for perturbing orbit) / (period of planetary orbit)
+    """
+    params = compute_perturbing_orbit_params(v_infty=v_infty, b=b, m1=m1, m2=m2)
+    t_int, _ = compute_integration_params(params.a_pert, params.e_pert, params.rp)
+    t_per = math.sqrt(a**3 / (m1 + m2))
     return t_int / t_per
 
 
@@ -231,8 +272,11 @@ def is_analytic_valid(
     )
 
 
-@numba.njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True)
 def f(e: float) -> float:
+    """
+    Helper function for de_tid_dt and da_tid_dt
+    """
     e2 = e * e
     e4 = e2 * e2
     e6 = e4 * e2
@@ -251,7 +295,7 @@ def f(e: float) -> float:
     return num / denom
 
 
-@numba.njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True)
 def de_tid_dt(e: float, a: float, m1: float, m2: float) -> float:
     """
     de/dt for tidal circularization (in Myr^-1)
@@ -273,7 +317,7 @@ def de_tid_dt(e: float, a: float, m1: float, m2: float) -> float:
     return e_dot_tide
 
 
-@numba.njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True)
 def da_tid_dt(e: float, a: float, m1: float, m2: float) -> float:
     """
     da/dt for tidal circularization (in Myr^-1)
@@ -294,15 +338,15 @@ def da_tid_dt(e: float, a: float, m1: float, m2: float) -> float:
     return a_dot_tide
 
 
-@numba.njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True)
 def get_dn(
     dedn: float, dadn: float, e: float, a: float, C: float, n_cum: float
 ) -> float:
     """
-    Get the step size for the tidal circularization integration
+    A sufficiently small step size for the tidal circularization integration
     """
-    e_safe = e if abs(e) > 1e-16 else 1e-16
-    a_safe = a if abs(a) > 1e-16 else 1e-16
+    e_safe = e if abs(e) > _EPS16 else _EPS16
+    a_safe = a if abs(a) > _EPS16 else _EPS16
     s1 = abs(dedn) / e_safe
     s2 = abs(dadn) / a_safe
     m = s1 if s1 >= s2 else s2
@@ -311,13 +355,12 @@ def get_dn(
     return step if step <= rem else rem
 
 
-@numba.njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True)
 def tidal_effect(
     e: float, a: float, m1: float, m2: float, time_in_Myr: float, C: float = 0.01
-) -> Tuple[float, float]:
+) -> TidalEffectResult:
     """
-    Calculate the new eccentricity (e) and semi-major axis (a) after tidal circularization
-    for time_in_Myr mega-years.
+    The new eccentricity (e) and semi-major axis (a) after tidal circularization after time_in_Myr
     """
     n_cum = 0.0
     while n_cum < 1.0 and e > 1e-3:
@@ -327,24 +370,34 @@ def tidal_effect(
         n_cum += dn
         e += dedn * dn
         a += dadn * dn
-    return e, a
+    return TidalEffectResult(e, a)
 
 
-@numba.njit(cache=True, fastmath=True)
-def get_critical_radii(m1: float, m2: float) -> Tuple[float, float, float]:
+@njit(cache=True, fastmath=True)
+def get_critical_radii(m1: float, m2: float) -> CriticalRadii:
     """
     The critical orbital separations for tidal-disruption, HJ formation and WJ formation
     """
     R_td = ETA * R_P * (m1 / m2) ** (1 / 3)
     R_hj = (MAX_HJ_PERIOD**2 * (m1 + m2)) ** (1 / 3)
     R_wj = (MAX_WJ_PERIOD**2 * (m1 + m2)) ** (1 / 3)
-    return R_td, R_hj, R_wj
+    return CriticalRadii(R_td, R_hj, R_wj)
 
 
-@numba.njit(cache=True, fastmath=True)
+# ############################
+# Encounter rate
+# ############################
+
+
+@njit(cache=True, fastmath=True)
 def get_perts_per_Myr(local_n_tot: float, local_sigma_v: float) -> float:
     """
-    Average perturbation rate (in inverse mega-years) given the local stellar density
-    and velocity dispersion
+    Average perturbation rate (in inverse Myr)
     """
-    return 3.21 * local_n_tot * ((B_MAX / 75) ** 2) * (local_sigma_v * np.sqrt(2))
+    _ADJUSTED_GAMMA = 3.21
+    return (
+        _ADJUSTED_GAMMA
+        * local_n_tot
+        * ((B_MAX / 75) ** 2)
+        * (local_sigma_v * np.sqrt(2))
+    )
