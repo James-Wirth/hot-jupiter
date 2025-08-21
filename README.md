@@ -3,6 +3,10 @@
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 ![CI](https://github.com/James-Wirth/hot-jupiter/actions/workflows/ci.yml/badge.svg)
 
+> This repository accompanies the paper:  
+> **"Hot Jupiter formation in dense stellar clusters: A Monte Carlo model applied to 47 Tucanae"**  
+> James A. Wirth, Cathie C. Clarke, Andrew J. Winter. *Monthly Notices of the Royal Astronomical Society, 2025.*  
+> [DOI](https://doi.org/10.1093/mnras/staf1325) | [arXiv](https://arxiv.org/abs/2508.08406)
 
 **HotJupiter** is a Monte-Carlo simulation package for studying Hot Jupiter formation in dense globular clusters via high-eccentricity migration. We have used the [REBOUND](https://github.com/hannorein/rebound) code with the IAS15 numerical integrator to simulate the dynamical evolution of planetary systems due to stellar perturbation over Gyr timescales.
 
