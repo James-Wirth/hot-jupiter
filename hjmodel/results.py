@@ -57,7 +57,7 @@ class Results:
         if exclude:
             stopcodes = tuple(self._normalize_label(lbl) for lbl in exclude)
             codes = [sc.value for sc in stopcodes]
-            df = _df[~_df["stopping_condition"].isin(codes)]
+            _df = _df[~_df["stopping_condition"].isin(codes)]
         if r_range:
             r_min, r_max = r_range
             _df = _df[_df["r"].between(r_min, r_max)]
@@ -67,7 +67,7 @@ class Results:
             for label, frac in sample_frac.items():
                 sc = self._normalize_label(label)
                 code = sc.value
-                group = df[df["stopping_condition"] == code]
+                group = _df[_df["stopping_condition"] == code]
                 parts.append(group.sample(frac=frac, random_state=0))
             excluded_codes = [
                 self._normalize_label(lbl).value for lbl in sample_frac.keys()
