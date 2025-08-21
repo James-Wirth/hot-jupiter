@@ -7,17 +7,35 @@ import numpy as np
 from clusters import DensityProfile
 from hjmodel.config import AU_PER_PSC, G
 
+# ############################
+# Defaults (for 47 Tuc)
+# ############################
+
+_N0: float = (2.0e6,)
+_R0: float = (1.91,)
+_A: float = 6.991e-4
+_M_AVG: float = 0.8
+_M0: float = 1.64e6
+_M1: float = 0.9e6
+_T_AGE: float = 12000.0
+
+# ############################
+# Plummer-specific constants
+# ############################
+
+_A_OVER_RH = 0.766
+
 
 class Plummer(DensityProfile):
     def __init__(
         self,
-        N0: float,
-        R0: float,
-        A: float,
-        M_avg: float = 0.8,
-        M0: float = 1.64e6,
-        M1: float = 0.9e6,
-        T_AGE: float = 12000.0,
+        N0: float = _N0,
+        R0: float = _R0,
+        A: float = _A,
+        M_avg: float = _M_AVG,
+        M0: float = _M0,
+        M1: float = _M1,
+        T_AGE: float = _T_AGE,
     ):
         self.N0 = N0
         self.R0 = R0
@@ -32,7 +50,7 @@ class Plummer(DensityProfile):
         return (self.R0**1.5 + self.A * t) ** (2 / 3)
 
     def a(self, t: float) -> float:
-        return 0.766 * self.rh(t)
+        return _A_OVER_RH * self.rh(t)
 
     def M_t(self, t: float) -> float:
         return self.M0 + (self.M1 - self.M0) * (t / self.T_AGE)
