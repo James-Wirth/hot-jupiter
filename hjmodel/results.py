@@ -283,10 +283,10 @@ class Results:
 
         stopcodes = self._normalize_labels(outcomes)
         codes = [sc.value for sc in stopcodes]
-        df = self.df[
+        _df = self.df[
             (self.df["stopping_condition"].isin(codes)) & (self.df["r"] <= r_max)
         ]
-        return df[feature].tolist()
+        return _df[feature].tolist()
 
     def project_radius(self, random_seed: Optional[int] = None) -> None:
         rng = np.random.default_rng(random_seed)
