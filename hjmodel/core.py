@@ -23,6 +23,7 @@ from hjmodel.config import (
 
 # ############################
 # Named tuples for cleaner return types
+# (cleaner here than full classes)
 # ############################
 
 SimResult = namedtuple("SimResult", ["delta_e_sim", "delta_a_sim"])

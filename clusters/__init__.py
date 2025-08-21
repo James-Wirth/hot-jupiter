@@ -1,6 +1,14 @@
+from dataclasses import dataclass
+
 import numpy as np
 
 from clusters.profiles import DensityProfile
+
+
+@dataclass
+class LocalEnvironment:
+    n_tot: float
+    sigma_v: float
 
 
 class Cluster:
@@ -12,29 +20,31 @@ class Cluster:
         self.profile = profile
         self.r_max = r_max
 
-    def get_number_density(self, r: float, t: float):
+    def get_number_density(self, r: float, t: float) -> float:
         return self.profile.get_number_density(r, t)
 
-    def get_isotropic_velocity_dispersion(self, r: float, t: float):
+    def get_isotropic_velocity_dispersion(self, r: float, t: float) -> float:
         return self.profile.get_isotropic_velocity_dispersion(r, t)
 
-    def get_mass_fraction_within_radius(self, r: float, t: float):
+    def get_mass_fraction_within_radius(self, r: float, t: float) -> float:
         return self.profile.get_mass_fraction_within_radius(r, t)
 
-    def get_radius(self, lagrange: float, t: float):
+    def get_radius(self, lagrange: float, t: float) -> float:
         if not (0 < lagrange < 1):
             raise ValueError(
                 "Lagrange mass fraction must be between 0 and 1 (exclusive)"
             )
         return self.profile.get_radius(lagrange, t)
 
-    def get_local_environment(self, r: float, t: float):
-        return {
-            "n_tot": self.get_number_density(r, t),
-            "sigma_v": self.get_isotropic_velocity_dispersion(r, t),
-        }
+    def get_local_environment(self, r: float, t: float) -> LocalEnvironment:
+        return LocalEnvironment(
+            n_tot=self.get_number_density(r, t),
+            sigma_v=self.get_isotropic_velocity_dispersion(r, t),
+        )
 
-    def get_lagrange_distribution(self, n_samples: int, t: float, seed=None):
+    def get_lagrange_distribution(
+        self, n_samples: int, t: float, seed=None
+    ) -> np.ndarray:
         if seed is not None:
             np.random.seed(seed)
 
