@@ -48,18 +48,19 @@ class Results:
         sample_frac_items: Optional[Tuple[Tuple[str, float], ...]],
         r_range: Optional[Tuple[float, float]],
     ) -> pd.DataFrame:
-        df = self.df
+
+        _df = self.df.copy()
         if include:
             stopcodes = tuple(self._normalize_label(lbl) for lbl in include)
             codes = [sc.value for sc in stopcodes]
-            df = df[df["stopping_condition"].isin(codes)]
+            _df = _df[_df["stopping_condition"].isin(codes)]
         if exclude:
             stopcodes = tuple(self._normalize_label(lbl) for lbl in exclude)
             codes = [sc.value for sc in stopcodes]
-            df = df[~df["stopping_condition"].isin(codes)]
+            df = _df[~_df["stopping_condition"].isin(codes)]
         if r_range:
             r_min, r_max = r_range
-            df = df[df["r"].between(r_min, r_max)]
+            _df = _df[_df["r"].between(r_min, r_max)]
         if sample_frac_items:
             sample_frac = dict(sample_frac_items)
             parts = []
@@ -71,9 +72,9 @@ class Results:
             excluded_codes = [
                 self._normalize_label(lbl).value for lbl in sample_frac.keys()
             ]
-            others = df[~df["stopping_condition"].isin(excluded_codes)]
-            df = pd.concat(parts + [others], ignore_index=True)
-        return df.copy()
+            others = _df[~_df["stopping_condition"].isin(excluded_codes)]
+            _df = pd.concat(parts + [others], ignore_index=True)
+        return _df
 
     def filter_outcomes(
         self,
@@ -111,14 +112,14 @@ class Results:
         yrange: Tuple[float, float] = (1, 1e5),
     ) -> None:
 
-        df = self.filter_outcomes(exclude=list(exclude)).assign(
+        _df = self.filter_outcomes(exclude=list(exclude)).assign(
             x=lambda d: d["final_a"], y=lambda d: 1 / (1 - d["final_e"])
         )
         cmap = self._cmap()
         ax.scatter(
-            df["x"],
-            df["y"],
-            c=df["stopping_condition"],
+            _df["x"],
+            _df["y"],
+            c=_df["stopping_condition"],
             cmap=cmap,
             s=1,
             rasterized=True,
@@ -151,7 +152,7 @@ class Results:
     ) -> None:
         import seaborn as sns
 
-        df = self.filter_outcomes(include=list(include)).assign(
+        _df = self.filter_outcomes(include=list(include)).assign(
             stopping_time_Gyr=lambda d: d["stopping_time"] / 1e3,
             stopping_label=lambda d: d["stopping_condition"].map(self.id2label),
         )
@@ -159,7 +160,7 @@ class Results:
         palette = {sc.name: sc.hex for sc in StopCode}
 
         sns.histplot(
-            data=df,
+            data=_df,
             x="stopping_time_Gyr",
             hue="stopping_label",
             ax=ax,
@@ -191,13 +192,13 @@ class Results:
     ) -> None:
         import seaborn as sns
 
-        df = self.filter_outcomes(
+        _df = self.filter_outcomes(
             include=list(conditions), sample_frac={"NM": 1 - drop_frac}
         )
         for cond in conditions:
             sc = self._normalize_label(cond)
             code = sc.value
-            dsub = df[df["stopping_condition"] == code]
+            dsub = _df[_df["stopping_condition"] == code]
             sns.histplot(
                 data=dsub,
                 y="final_a",
@@ -225,13 +226,13 @@ class Results:
         yrange: Tuple[float, float] = (0.01, 100),
     ) -> None:
 
-        df = self.filter_outcomes(
+        _df = self.filter_outcomes(
             include=list(conditions), sample_frac={"NM": 1 - drop_frac}
         )
         for z, cond in enumerate(conditions):
             sc = self._normalize_label(cond)
             code = sc.value
-            dsub = df[df["stopping_condition"] == code]
+            dsub = _df[_df["stopping_condition"] == code]
             ax.scatter(
                 dsub["r"],
                 dsub["final_a"],
@@ -258,18 +259,18 @@ class Results:
         r_max: float = 100.0,
     ) -> Dict[str, float]:
 
-        df = self.df
+        _df = self.df.copy()
         if r_range:
-            df = df[df["r"].between(r_range[0], r_range[1])]
+            _df = _df[_df["r"].between(r_range[0], r_range[1])]
         else:
-            df = df[df["r"] <= r_max]
-        total = len(df)
+            _df = _df[_df["r"] <= r_max]
+        total = len(_df)
         label_to_id = {sc.name: sc.value for sc in StopCode}
         if total == 0:
             logger.warning("[compute_outcome_probabilities] empty filtered dataset.")
             return {label: 0.0 for label in label_to_id.keys()}
         return {
-            label: len(df[df["stopping_condition"] == code]) / total
+            label: len(_df[_df["stopping_condition"] == code]) / total
             for label, code in label_to_id.items()
         }
 
@@ -341,11 +342,11 @@ class Results:
             logger.warning("[plot_projected_probability] empty histogram, skipping.")
             return
         hist = hist.rename("proportion")
-        df = hist.reset_index()
+        _df = hist.reset_index()
         bin_col = hist.index.names[0]
-        df = df.rename(columns={bin_col: "binned"})
-        df["bin_left"] = df["binned"].apply(lambda iv: iv.left)
-        for cond, grp in df.groupby("stopping_condition"):
+        _df = _df.rename(columns={bin_col: "binned"})
+        _df["bin_left"] = _df["binned"].apply(lambda iv: iv.left)
+        for cond, grp in _df.groupby("stopping_condition"):
             ax.step(
                 grp["bin_left"],
                 grp["proportion"],
