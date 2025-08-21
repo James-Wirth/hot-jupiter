@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 import numpy as np
 from joblib import Parallel, cpu_count, delayed
 
-from clusters import Cluster
+from clusters import Cluster, LocalEnvironment
 from hjmodel import core
 from hjmodel.config import (
     A_BR,
@@ -28,8 +28,19 @@ from hjmodel.config import (
 logger = logging.getLogger(__name__)
 
 
+# ############################
+# Stopping conditions
+# ############################
+
+
 def check_stopping_conditions(
-    e: float, a: float, t: float, R_td: float, R_hj: float, R_wj: float, total_time: int
+    e: float,
+    a: float,
+    t: float,
+    R_td: float,
+    R_hj: float,
+    R_wj: float,
+    total_time: float,
 ) -> Optional[StopCode]:
 
     if e >= 1:
@@ -47,14 +58,15 @@ def check_stopping_conditions(
     return None
 
 
-class EvolutionError(Exception):
-    pass
-
-
 def _resolve_n_jobs(num_cpus: int) -> int:
     if num_cpus is None or num_cpus < 0:
         return max(1, cpu_count() - 1)
     return num_cpus
+
+
+# ############################
+# Sampling for the initial planetary orbit
+# ############################
 
 
 def _sample_e_init(rng: np.random.Generator) -> float:
@@ -107,6 +119,9 @@ def _sample_m1(rng: np.random.Generator) -> float:
 
 
 def _sample_m2(_: Optional[np.random.Generator] = None) -> float:
+    """
+    Planetary mass m2 fixed to 1e-3 M_solar in our simulations
+    """
     return 1e-3
 
 
@@ -149,6 +164,10 @@ class PlanetarySystem:
             },
         )
 
+    # ############################
+    # Individual + batch sampling for initial planetary system states
+    # ############################
+
     @classmethod
     def sample(cls, lagrange: float, system_seed: int) -> "PlanetarySystem":
         system_rng = np.random.default_rng(system_seed)
@@ -189,10 +208,14 @@ class PlanetarySystem:
             for seed, lagrange in zip(system_seeds, lagrange_radii)
         )
 
+    # ############################
+    # Evolution driver (with specified cluster background)
+    # ############################
+
     def evolve(
         self,
         cluster: Cluster,
-        total_time: int,
+        total_time: float,
         hybrid_switch: bool = True,
         max_iters: int = 1_000_000,
     ) -> None:
@@ -211,10 +234,9 @@ class PlanetarySystem:
                 break
 
             r = cluster.get_radius(lagrange=self.lagrange, t=t)
-            env = cluster.get_local_environment(r, t)
-            encounter_sampler.sigma_v = env["sigma_v"]
+            encounter_sampler.local_env = cluster.get_local_environment(r, t)
+            wt_time = encounter_sampler.get_waiting_time()
 
-            wt_time = encounter_sampler.get_waiting_time(env_vars=env)
             self.e, self.a = core.tidal_effect(
                 e=self.e, a=self.a, m1=self.m1, m2=self.m2, time_in_Myr=wt_time
             )
@@ -255,7 +277,7 @@ class PlanetarySystem:
     def run(
         self,
         cluster: Cluster,
-        total_time: int,
+        total_time: float,
         hybrid_switch: bool = True,
     ) -> Dict[str, float]:
 
@@ -289,11 +311,11 @@ class EncounterSampler:
 
     def __init__(
         self,
-        sigma_v: float,
+        local_env: LocalEnvironment,
         override_b_max: float = B_MAX,
         rng: Optional[np.random.Generator] = None,
     ):
-        self.sigma_v = sigma_v
+        self.local_env = local_env
         self.override_b_max = override_b_max
         self.rng = rng or np.random.default_rng()
 
@@ -301,9 +323,9 @@ class EncounterSampler:
         return math.sqrt(self.rng.random() * self.override_b_max**2)
 
     def sample_v_infty(self) -> float:
-        sigma_rel = self.sigma_v * math.sqrt(2.0)
+        sigma_rel = self.local_env.sigma_v * math.sqrt(2.0)
         if not np.isfinite(sigma_rel) or sigma_rel <= 0.0:
-            return float(self.sigma_v)
+            raise ValueError(f"Invalid sigma_v: {self.local_env.sigma_v}")
 
         x, y, z = self.rng.normal(0.0, sigma_rel, size=3)
         v = math.sqrt(x * x + y * y + z * z)
@@ -338,5 +360,8 @@ class EncounterSampler:
         )
         return params
 
-    def get_waiting_time(self, env_vars: Dict[str, float]) -> float:
-        return self.rng.exponential(1.0 / core.get_perts_per_Myr(*env_vars.values()))
+    def get_waiting_time(self) -> float:
+        perts_per_Myr = core.get_perts_per_Myr(
+            local_n_tot=self.local_env.n_tot, local_sigma_v=self.local_env.sigma_v
+        )
+        return self.rng.exponential(1.0 / perts_per_Myr)

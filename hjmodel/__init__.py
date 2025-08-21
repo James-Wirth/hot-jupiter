@@ -14,6 +14,7 @@ from joblib import Parallel, cpu_count, delayed
 from more_itertools import chunked
 
 from clusters import Cluster
+from hjmodel.evolution import PlanetarySystem
 from hjmodel.results import Results
 
 logger = logging.getLogger(__name__)
@@ -106,7 +107,7 @@ class HJModel:
 
     def run(
         self,
-        time: int,
+        time: float,
         num_systems: int,
         cluster: Cluster,
         num_batches: int = 10,
@@ -142,8 +143,6 @@ class HJModel:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         rng = np.random.default_rng(seed)
-        from hjmodel.evolution import PlanetarySystem
-
         planetary_systems = PlanetarySystem.sample_batch(
             n_samples=num_systems,
             cluster=cluster,
