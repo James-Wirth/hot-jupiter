@@ -1,8 +1,8 @@
 [project]
 name = "hot-jupiter"
 version = "0.1.0"
-description = "Modeling and simulating hot Jupiter evolution"
-authors = [{ name = "Your Name", email = "you@example.com" }]
+description = "MC simulations of HJ Formation in dense stellar clusters"
+authors = [{ name = "James Wirth" }]
 requires-python = ">=3.8"
 
 [build-system]
@@ -10,7 +10,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["hjmodel", "clusters"]
+packages = ["hjmodel"]
 
 [tool.isort]
 profile = "black"
