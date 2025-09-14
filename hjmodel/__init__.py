@@ -13,7 +13,7 @@ import pandas as pd
 from joblib import Parallel, cpu_count, delayed
 from more_itertools import chunked
 
-from clusters import Cluster
+from hjmodel.clusters import Cluster
 from hjmodel.evolution import PlanetarySystem
 from hjmodel.results import Results
 

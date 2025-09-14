@@ -6,8 +6,8 @@ from typing import Dict, List, Optional
 import numpy as np
 from joblib import Parallel, cpu_count, delayed
 
-from clusters import Cluster, LocalEnvironment
 from hjmodel import core
+from hjmodel.clusters import Cluster, LocalEnvironment
 from hjmodel.config import (
     A_BR,
     A_MAX,
@@ -220,7 +220,7 @@ class PlanetarySystem:
         max_iters: int = 1_000_000,
     ) -> None:
 
-        encounter_sampler = EncounterSampler(sigma_v=0.0, rng=self.rng)
+        encounter_sampler = EncounterSampler(rng=self.rng)
 
         R_td, R_hj, R_wj = core.get_critical_radii(m1=self.m1, m2=self.m2)
         t = 0.0
@@ -234,8 +234,8 @@ class PlanetarySystem:
                 break
 
             r = cluster.get_radius(lagrange=self.lagrange, t=t)
-            encounter_sampler.local_env = cluster.get_local_environment(r, t)
-            wt_time = encounter_sampler.get_waiting_time()
+            local_env = cluster.get_local_environment(r, t)
+            wt_time = encounter_sampler.get_waiting_time(local_env=local_env)
 
             self.e, self.a = core.tidal_effect(
                 e=self.e, a=self.a, m1=self.m1, m2=self.m2, time_in_Myr=wt_time
@@ -249,7 +249,7 @@ class PlanetarySystem:
                 break
 
             kwargs = {
-                **encounter_sampler.sample_encounter(),
+                **encounter_sampler.sample_encounter(local_env=local_env),
                 "e": self.e,
                 "a": self.a,
                 "m1": self.m1,
@@ -258,7 +258,7 @@ class PlanetarySystem:
             if core.is_analytic_valid(**kwargs) or not hybrid_switch:
                 self.e += core.de_hr(**kwargs)
             else:
-                de, da = core.de_sim(**kwargs)
+                de, da = core.de_sim(**kwargs, rng=self.rng)
                 self.e += de
                 self.a += da
 
@@ -303,29 +303,23 @@ class PlanetarySystem:
         }
 
 
+@dataclass(slots=True)
 class EncounterSampler:
     """
     This helper class generates randomized encounter parameters
     (i.e. orientation, impact parameter, approach speed, perturber mass)
     """
 
-    def __init__(
-        self,
-        local_env: LocalEnvironment,
-        override_b_max: float = B_MAX,
-        rng: Optional[np.random.Generator] = None,
-    ):
-        self.local_env = local_env
-        self.override_b_max = override_b_max
-        self.rng = rng or np.random.default_rng()
+    override_b_max: float = B_MAX
+    rng: np.random.Generator = field(default_factory=np.random.default_rng, repr=False)
 
     def sample_b(self) -> float:
-        return math.sqrt(self.rng.random() * self.override_b_max**2)
+        return self.override_b_max * math.sqrt(self.rng.random())
 
-    def sample_v_infty(self) -> float:
-        sigma_rel = self.local_env.sigma_v * math.sqrt(2.0)
+    def sample_v_infty(self, local_env: LocalEnvironment) -> float:
+        sigma_rel = local_env.sigma_v * math.sqrt(2.0)
         if not np.isfinite(sigma_rel) or sigma_rel <= 0.0:
-            raise ValueError(f"Invalid sigma_v: {self.local_env.sigma_v}")
+            raise ValueError(f"Invalid sigma_v: {local_env.sigma_v}")
 
         x, y, z = self.rng.normal(0.0, sigma_rel, size=3)
         v = math.sqrt(x * x + y * y + z * z)
@@ -349,19 +343,19 @@ class EncounterSampler:
 
         return ((M_BR**-1.8) + (1.8 / b) * (y_crit - y)) ** (-1 / 1.8)
 
-    def sample_encounter(self) -> Dict[str, float]:
+    def sample_encounter(self, local_env: LocalEnvironment) -> Dict[str, float]:
         params = self.sample_orientation()
         params.update(
             {
-                "v_infty": self.sample_v_infty(),
+                "v_infty": self.sample_v_infty(local_env=local_env),
                 "b": self.sample_b(),
                 "m3": self.sample_m3(),
             }
         )
         return params
 
-    def get_waiting_time(self) -> float:
+    def get_waiting_time(self, local_env: LocalEnvironment) -> float:
         perts_per_Myr = core.get_perts_per_Myr(
-            local_n_tot=self.local_env.n_tot, local_sigma_v=self.local_env.sigma_v
+            local_n_tot=local_env.n_tot, local_sigma_v=local_env.sigma_v
         )
         return self.rng.exponential(1.0 / perts_per_Myr)

@@ -205,6 +205,7 @@ def de_sim(
     m1: float,
     m2: float,
     m3: float,
+    rng: np.random.Generator,
 ) -> SimResult:
     """
     Eccentricity excitation via full N-body integration (REBOUND)
@@ -214,7 +215,7 @@ def de_sim(
     )
     t_int, f0 = compute_integration_params(a_pert=a_pert, e_pert=e_pert, rp=rp)
 
-    idx = np.random.randint(_MEAN_ANOMS_GRID.size)
+    idx = int(rng.integers(0, _MEAN_ANOMS_GRID.size))
     f_phase = convert_mean_to_true_anomaly(float(_MEAN_ANOMS_GRID[idx]), e)
 
     sim = rebound.Simulation()
