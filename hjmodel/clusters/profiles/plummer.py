@@ -4,7 +4,7 @@ An example density profile: a time-dependent Plummer profile for 47 Tuc
 
 import numpy as np
 
-from clusters import DensityProfile
+from hjmodel.clusters import DensityProfile
 from hjmodel.config import AU_PER_PSC, G
 
 # ############################

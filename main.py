@@ -1,9 +1,9 @@
 import logging
 from pathlib import Path
 
-from clusters import Cluster
-from clusters.profiles.plummer import Plummer
 from hjmodel import HJModel
+from hjmodel.clusters import Cluster
+from hjmodel.clusters.profiles.plummer import Plummer
 
 NAME = "EXAMPLE"
 TIME = 12000  # in Myr

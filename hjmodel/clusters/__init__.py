@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from clusters.profiles import DensityProfile
+from hjmodel.clusters.profiles import DensityProfile
 
 
 @dataclass

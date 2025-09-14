@@ -39,8 +39,8 @@ Create a cluster instance to serve as the background for the simulation. We have
 
 ```python
 
-from clusters import Cluster
-from clusters.profiles.plummer import Plummer
+from hjmodel.clusters import Cluster
+from hjmodel.clusters.profiles.plummer import Plummer
 
 cluster = Cluster(
     profile=Plummer(N0=2e6, R0=1.91, A=6.99e-4),
