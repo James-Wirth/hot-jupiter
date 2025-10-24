@@ -7,21 +7,14 @@ import numpy as np
 from hjmodel.clusters import DensityProfile
 from hjmodel.config import AU_PER_PSC, G
 
-# ############################
-# Defaults (for 47 Tuc)
-# ############################
-
-_N0: float = (2.0e6,)
-_R0: float = (1.91,)
+_N0: float = 2.0e6
+_R0: float = 1.91
 _A: float = 6.991e-4
 _M_AVG: float = 0.8
 _M0: float = 1.64e6
 _M1: float = 0.9e6
 _T_AGE: float = 12000.0
 
-# ############################
-# Plummer-specific constants
-# ############################
 
 _A_OVER_RH = 0.766
 
