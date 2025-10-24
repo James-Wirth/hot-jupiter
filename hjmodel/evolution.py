@@ -28,11 +28,6 @@ from hjmodel.config import (
 logger = logging.getLogger(__name__)
 
 
-# ############################
-# Stopping conditions
-# ############################
-
-
 def check_stopping_conditions(
     e: float,
     a: float,
@@ -62,11 +57,6 @@ def _resolve_n_jobs(num_cpus: int) -> int:
     if num_cpus is None or num_cpus < 0:
         return max(1, cpu_count() - 1)
     return num_cpus
-
-
-# ############################
-# Sampling for the initial planetary orbit
-# ############################
 
 
 def _sample_e_init(rng: np.random.Generator) -> float:
@@ -164,10 +154,6 @@ class PlanetarySystem:
             },
         )
 
-    # ############################
-    # Individual + batch sampling for initial planetary system states
-    # ############################
-
     @classmethod
     def sample(cls, lagrange: float, system_seed: int) -> "PlanetarySystem":
         system_rng = np.random.default_rng(system_seed)
@@ -196,7 +182,9 @@ class PlanetarySystem:
         num_cpus: int = NUM_CPUS,
     ) -> List["PlanetarySystem"]:
 
-        lagrange_radii = cluster.get_lagrange_distribution(n_samples=n_samples, t=0)
+        lagrange_radii = cluster.get_lagrange_distribution(
+            n_samples=n_samples, t=0, rng=rng
+        )
         system_seeds = rng.integers(0, 2**32 - 1, size=n_samples)
 
         def _make_system(system_seed: int, lagrange: float) -> PlanetarySystem:
@@ -207,10 +195,6 @@ class PlanetarySystem:
             delayed(_make_system)(int(seed), float(lagrange))
             for seed, lagrange in zip(system_seeds, lagrange_radii)
         )
-
-    # ############################
-    # Evolution driver (with specified cluster background)
-    # ############################
 
     def evolve(
         self,

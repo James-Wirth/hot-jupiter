@@ -21,21 +21,12 @@ from hjmodel.config import (
     G,
 )
 
-# ############################
-# Named tuples for cleaner return types
-# (cleaner here than full classes)
-# ############################
-
 SimResult = namedtuple("SimResult", ["delta_e_sim", "delta_a_sim"])
-
 PerturbingOrbitParams = namedtuple("PerturbingOrbitParams", ["a_pert", "e_pert", "rp"])
 IntegrationParams = namedtuple("IntegrationParams", ["t_int", "f0"])
 TidalEffectResult = namedtuple("TidalEffectResult", ["e", "a"])
 CriticalRadii = namedtuple("CriticalRadii", ["R_td", "R_hj", "R_wj"])
 
-# ############################
-# Constants
-# ############################
 
 _MEAN_ANOMS_GRID = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)
 _EPS16 = 1e-16
@@ -43,11 +34,6 @@ _EPS15 = 1e-15
 _EPS14 = 1e-14
 
 logger = logging.getLogger(__name__)
-
-
-# ############################
-# Solving the Kepler equation
-# ############################
 
 
 @njit(cache=True, fastmath=True, inline="always")
@@ -101,11 +87,6 @@ def convert_mean_to_true_anomaly(mean_anom: float, e: float) -> float:
     return _make_true_anomaly_from_E(E, e)
 
 
-# ############################
-# Orbital parameters of the perturber
-# ############################
-
-
 @njit(cache=True, fastmath=True)
 def compute_perturbing_orbit_params(
     v_infty: float, b: float, m1: float, m2: float
@@ -151,11 +132,6 @@ def compute_integration_params(
     t = (e_pert * math.sinh(F) - F) * (-a_pert) ** 1.5
 
     return IntegrationParams(2.0 * t, -alpha * max_anomaly)
-
-
-# ############################
-# Eccentricity excitation models
-# ############################
 
 
 @njit(cache=True, fastmath=True)
@@ -231,11 +207,6 @@ def de_sim(
 
     sim = None
     return SimResult(delta_e_sim, delta_a_sim)
-
-
-# ############################
-# Tidal circularization theory
-# ############################
 
 
 @njit(cache=True, fastmath=True)
@@ -384,11 +355,6 @@ def get_critical_radii(m1: float, m2: float) -> CriticalRadii:
     R_hj = (MAX_HJ_PERIOD**2 * (m1 + m2)) ** (1 / 3)
     R_wj = (MAX_WJ_PERIOD**2 * (m1 + m2)) ** (1 / 3)
     return CriticalRadii(R_td, R_hj, R_wj)
-
-
-# ############################
-# Encounter rate
-# ############################
 
 
 @njit(cache=True, fastmath=True)
