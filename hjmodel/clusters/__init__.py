@@ -43,10 +43,11 @@ class Cluster:
         )
 
     def get_lagrange_distribution(
-        self, n_samples: int, t: float, seed=None
+        self, n_samples: int, t: float, rng: np.random.Generator = None
     ) -> np.ndarray:
-        if seed is not None:
-            np.random.seed(seed)
+
+        if rng is None:
+            rng = np.random.default_rng()
 
         cdf_max = self.profile.get_mass_fraction_within_radius(self.r_max, t)
         if not (0 < cdf_max <= 1):
@@ -55,6 +56,4 @@ class Cluster:
             )
 
         bins = np.linspace(0, cdf_max, n_samples + 1)
-        return np.array(
-            [np.random.uniform(bins[i], bins[i + 1]) for i in range(n_samples)]
-        )
+        return rng.uniform(bins[:-1], bins[1:])
