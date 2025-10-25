@@ -75,24 +75,18 @@ When acessing `model.results` (see next section), data from all runs are automat
 
 ## Results
 
-Access results via:
-
-```python
-results = model.results
-```
-
 The outcome probabilities can be accessed via:
 
 ```python
-results.compute_outcome_probabilities(r_range=(R_MIN, R_MAX))
+model.results.compute_outcome_probabilities(r_range=(R_MIN, R_MAX))
 ```
 
-The `results` object includes built-in methods for generating key plots, e.g.:
+The `models.results` object includes built-in methods for generating key plots, e.g.:
 
 ```python
 import matplotlib.pyplot as plt
 
 fig, ax = plt.subplots()
-results.plot_phase_plane(ax)
+model.results.plot_phase_plane(ax)
 plt.show()
 ```
