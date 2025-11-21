@@ -3,11 +3,9 @@ import logging
 import math
 import os
 import re
-import shutil
 from pathlib import Path
 from typing import Optional
 
-import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 from joblib import Parallel, cpu_count, delayed
@@ -16,18 +14,12 @@ from more_itertools import chunked
 from hjmodel.clusters import Cluster
 from hjmodel.evolution import PlanetarySystem
 from hjmodel.results import Results
+from hjmodel.utils.dask import DaskProcessor
 
 logger = logging.getLogger(__name__)
 
 
 class HJModel:
-    """
-    This class orchestrates the simulations, by:
-
-    (i) Creating an output directory for the new model run
-    (ii) Dispatching the planetary system evolution to the PlanetarySystem class in evolution.py
-    (iii) Saving the batched results
-    """
 
     def __init__(self, name: str, base_dir: Path = None):
 
@@ -48,7 +40,7 @@ class HJModel:
 
         logger.info("Initialized HJModel for experiment '%s'.", self.name)
 
-    def _load_all_runs_df(self) -> pd.DataFrame:
+    def _load_all_runs(self) -> pd.DataFrame:
         result_files = sorted(self.exp_path.glob("run_*/results.parquet"))
         if not result_files:
             return pd.DataFrame()
@@ -64,7 +56,7 @@ class HJModel:
         if dfs:
             concatenated = pd.concat(dfs, ignore_index=True)
             logger.info(
-                "Loaded combined DataFrame with %d rows from %d runs.",
+                "Loaded combined data with %d rows from %d runs.",
                 len(concatenated),
                 len(dfs),
             )
@@ -75,7 +67,7 @@ class HJModel:
     @property
     def df(self) -> pd.DataFrame:
         if self._df is None:
-            self._df = self._load_all_runs_df()
+            self._df = self._load_all_runs()
         return self._df
 
     def invalidate_cache(self):
@@ -136,11 +128,8 @@ class HJModel:
             self.name,
         )
 
-        output_dir = Path(self.path).parent / "parquet_batches"
-        if output_dir.exists():
-            logger.info("Cleaning existing directory: %s", output_dir)
-            shutil.rmtree(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        dask_processor = DaskProcessor(Path(self.path))
+        dask_processor.prepare_dir()
 
         rng = np.random.default_rng(seed)
         planetary_systems = PlanetarySystem.sample_batch(
@@ -167,37 +156,16 @@ class HJModel:
                     for ps in batch
                 )
                 partition_df = pd.DataFrame(results)
-                partition_path = output_dir / f"partition_{batch_idx + 1}.parquet"
-                partition_df.to_parquet(
-                    partition_path, engine="pyarrow", compression="snappy"
-                )
+                dask_processor.write_partition(partition_df)
                 del results, partition_df
                 gc.collect()
 
-            logger.info("All partitions processed. Combining results with Dask...")
-            ddf = dd.read_parquet(str(output_dir / "*.parquet"))
-            logger.info("Saving combined dataset to %s", self.path)
-
-            parent = os.path.dirname(self.path)
-            if parent:
-                os.makedirs(parent, exist_ok=True)
-            ddf.to_parquet(self.path, engine="pyarrow", write_index=False)
+            dask_processor.save_all_partitions()
         except Exception as exc:
             logger.error("run_dynamic failed during processing or saving: %s", exc)
             raise
         finally:
-            for partition_file in output_dir.glob("partition_*.parquet"):
-                try:
-                    partition_file.unlink()
-                except Exception:
-                    logger.warning("Couldn't delete partition file %s", partition_file)
-            try:
-                output_dir.rmdir()
-            except Exception:
-                logger.debug(
-                    "Couldn't remove output directory: %s (might not be empty)",
-                    output_dir,
-                )
+            dask_processor.clean_partitions()
 
         self.invalidate_cache()
 
