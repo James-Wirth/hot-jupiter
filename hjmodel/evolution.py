@@ -1,5 +1,4 @@
 import logging
-import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -8,21 +7,8 @@ from joblib import Parallel, cpu_count, delayed
 
 from hjmodel import core
 from hjmodel.clusters import Cluster
-from hjmodel.config import (
-    A_BR,
-    A_MAX,
-    A_MIN,
-    CIRCULARISATION_THRESHOLD_ECCENTRICITY,
-    E_INIT_MAX,
-    E_INIT_RMS,
-    M_BR,
-    M_MIN,
-    NUM_CPUS,
-    StopCode,
-    s1,
-    s2,
-)
-from hjmodel.encounters import EncounterSampler
+from hjmodel.config import CIRCULARISATION_THRESHOLD_ECCENTRICITY, NUM_CPUS, StopCode
+from hjmodel.sampling import EncounterSampler, SystemSampler
 
 logger = logging.getLogger(__name__)
 
@@ -58,69 +44,8 @@ def _resolve_n_jobs(num_cpus: int) -> int:
     return num_cpus
 
 
-def _sample_e_init(rng: np.random.Generator) -> float:
-    """
-    The initial eccentricity is sampled from a Rayleigh distribution
-    """
-    e_val = -1.0
-    F_max = 1 - math.exp(-(E_INIT_MAX**2) / (2 * E_INIT_RMS**2))
-    while e_val < 0.05:
-        u = rng.random() * F_max
-        e_val = math.sqrt(2 * E_INIT_RMS**2 * math.log(1 / (1 - u)))
-    return e_val
-
-
-def _sample_a_init(rng: np.random.Generator) -> float:
-    """
-    The initial semi-major axis is sampled from a broken power-law
-    distribution (Fernandes et al, 2019).
-    """
-
-    def sample_segment(u: float, a1: float, a2: float, alpha: float) -> float:
-        if alpha == -1:
-            return a1 * (a2 / a1) ** u
-        p = alpha + 1
-        return (a1**p + u * (a2**p - a1**p)) ** (1 / p)
-
-    def integral(a1: float, a2: float, alpha: float) -> float:
-        if alpha == -1:
-            return np.log(a2 / a1)
-        return (a2 ** (alpha + 1) - a1 ** (alpha + 1)) / (alpha + 1)
-
-    c2_over_c1 = A_BR ** (s1 - s2)
-    I1 = integral(A_MIN, A_BR, s1)
-    I2 = c2_over_c1 * integral(A_BR, A_MAX, s2)
-    prob1 = I1 / (I1 + I2)
-
-    u = rng.random()
-    if u < prob1:
-        return sample_segment(rng.random(), A_MIN, A_BR, s1)
-    else:
-        return sample_segment(rng.random(), A_BR, A_MAX, s2)
-
-
-def _sample_m1(rng: np.random.Generator) -> float:
-    """
-    m1 is sampled from the IMF for 47-Tuc due to Giersz and Heggie (2011)
-    """
-    y = rng.random()
-    return (M_MIN**0.6 * (1 - y) + y * M_BR**0.6) ** (1 / 0.6)
-
-
-def _sample_m2(_: Optional[np.random.Generator] = None) -> float:
-    """
-    Planetary mass m2 fixed to 1e-3 M_solar in our simulations
-    """
-    return 1e-3
-
-
 @dataclass
 class PlanetarySystem:
-    """
-    This class encapsulates the initial state and subsequent evolution of a single
-    planetary system, subjected to stochastic kicks due to stellar flybys
-    in a cluster background.
-    """
 
     e_init: float
     a_init: float
@@ -156,12 +81,18 @@ class PlanetarySystem:
     @classmethod
     def sample(cls, lagrange: float, system_seed: int) -> "PlanetarySystem":
         system_rng = np.random.default_rng(system_seed)
-        e_seed, a_seed, m1_seed, m2_seed = system_rng.integers(0, 2**32 - 1, size=4)
+        e_seed, a_seed, m1_seed = system_rng.integers(0, 2**32 - 1, size=3)
 
-        e_init = _sample_e_init(np.random.default_rng(int(e_seed)))
-        a_init = _sample_a_init(np.random.default_rng(int(a_seed)))
-        m1 = _sample_m1(np.random.default_rng(int(m1_seed)))
-        m2 = _sample_m2()
+        sampler = SystemSampler(rng=np.random.default_rng(int(e_seed)))
+        e_init = sampler.sample_e_init()
+
+        sampler.rng = np.random.default_rng(int(a_seed))
+        a_init = sampler.sample_a_init()
+
+        sampler.rng = np.random.default_rng(int(m1_seed))
+        m1 = sampler.sample_m1()
+
+        m2 = sampler.sample_m2()
 
         return cls(
             e_init=e_init,
