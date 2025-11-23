@@ -28,8 +28,8 @@ The final states of planetary systems are categorized into five unique outcomes:
 To get started with HotJupiter, clone the repository and install the dependencies:
 
 ```bash
-git clone https://github.com/James-Wirth/HotJupiter
-cd HotJupiter
+git clone https://github.com/James-Wirth/hot-jupiter
+cd hot-jupiter
 pip install -r requirements.txt
 ```
 
@@ -48,7 +48,7 @@ cluster = Cluster(
 )
 ```
 
-For guidance on running a simulation, see the provided driver script in `main.py`. You can customize the run directly:
+For guidance on running a simulation, see the provided example. You can customize the run parameters:
 
 ```python
 from hjmodel import HJModel
