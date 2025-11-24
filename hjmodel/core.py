@@ -24,11 +24,13 @@ from hjmodel.config import (
 SimResult = namedtuple("SimResult", ["delta_e_sim", "delta_a_sim"])
 PerturbingOrbitParams = namedtuple("PerturbingOrbitParams", ["a_pert", "e_pert", "rp"])
 IntegrationParams = namedtuple("IntegrationParams", ["t_int", "f0"])
+TidalDerivatives = namedtuple("TidalDerivatives", ["de_dt", "da_dt"])
 TidalEffectResult = namedtuple("TidalEffectResult", ["e", "a"])
 CriticalRadii = namedtuple("CriticalRadii", ["R_td", "R_hj", "R_wj"])
 
 
 _MEAN_ANOMS_GRID = np.linspace(-np.pi, np.pi, num=INIT_PHASES, endpoint=False)
+_XI_CBRT = XI ** (1.0 / 3.0)
 _EPS16 = 1e-16
 _EPS15 = 1e-15
 _EPS14 = 1e-14
@@ -88,11 +90,11 @@ def convert_mean_to_true_anomaly(mean_anom: float, e: float) -> float:
 
 
 @njit(cache=True, fastmath=True)
-def compute_perturbing_orbit_params(
+def get_perturber_orbit(
     v_infty: float, b: float, m1: float, m2: float
 ) -> PerturbingOrbitParams:
     """
-    Orbital parameters (a_pert, e_pert and r_p) for the perturber
+    Compute orbital parameters for a hyperbolic perturber.
     """
     _MIN_VINF = 1e-12
     if v_infty <= 0.0 or not math.isfinite(v_infty):
@@ -106,32 +108,26 @@ def compute_perturbing_orbit_params(
 
 
 @njit(cache=True, fastmath=True)
-def compute_integration_params(
+def get_integration_window(
     a_pert: float, e_pert: float, rp: float
 ) -> IntegrationParams:
     """
-    Integration time (t_int) and initial true anomaly (-f0) for the perturbing orbit
+    Compute integration time window and initial true anomaly for perturber.
     """
-    max_anomaly = math.acos(-1.0 / e_pert)
-    r_crit = rp / (XI ** (1.0 / 3.0))
+    r_crit = rp / _XI_CBRT
     x = (1.0 / e_pert) * (((a_pert * (1.0 - e_pert * e_pert)) / r_crit) - 1.0)
-    if x < -1.0:
-        x = -1.0
-    elif x > 1.0:
-        x = 1.0
+    x = max(-1.0, min(1.0, x))
 
     theta_crit = math.acos(x)
-    alpha = theta_crit / max_anomaly
 
-    c = math.cos(alpha * max_anomaly)
-    arg = (e_pert + c) / (1.0 + e_pert * c)
+    arg = (e_pert + x) / (1.0 + e_pert * x)
     if arg < 1.0:
         arg = 1.0
 
     F = math.acosh(arg)
     t = (e_pert * math.sinh(F) - F) * (-a_pert) ** 1.5
 
-    return IntegrationParams(2.0 * t, -alpha * max_anomaly)
+    return IntegrationParams(2.0 * t, -theta_crit)
 
 
 @njit(cache=True, fastmath=True)
@@ -151,16 +147,22 @@ def de_hr(
     Eccentricity excitation via Heggie-Rasio (1986) approximation
     """
     m123 = m1 + m2 + m3
-    params = compute_perturbing_orbit_params(v_infty, b, m1, m2)
+    params = get_perturber_orbit(v_infty, b, m1, m2)
 
     y = e * math.sqrt(max(0.0, 1.0 - e * e)) * (m3 / math.sqrt((m1 + m2) * m123))
     alpha = -1 * (15 / 4) * ((1 + params.e_pert) ** (-3 / 2))
     chi = math.acos(-1 / params.e_pert) + math.sqrt(params.e_pert**2 - 1)
     psi = (1 / 3) * (((params.e_pert**2 - 1) ** (3 / 2)) / (params.e_pert**2))
 
-    Theta1 = (math.sin(inc) ** 2) * math.sin(2 * Omega)
-    Theta2 = (1 + (math.cos(inc)) ** 2) * math.cos(2 * omega) * math.sin(2 * Omega)
-    Theta3 = 2 * math.cos(inc) * math.sin(2 * omega) * math.cos(2 * Omega)
+    cos_inc = math.cos(inc)
+    sin_2omega = math.sin(2 * omega)
+    cos_2omega = math.cos(2 * omega)
+    sin_2Omega = math.sin(2 * Omega)
+    cos_2Omega = math.cos(2 * Omega)
+
+    Theta1 = (1.0 - cos_inc * cos_inc) * sin_2Omega
+    Theta2 = (1.0 + cos_inc * cos_inc) * cos_2omega * sin_2Omega
+    Theta3 = 2.0 * cos_inc * sin_2omega * cos_2Omega
 
     return (
         alpha
@@ -186,10 +188,8 @@ def de_sim(
     """
     Eccentricity excitation via full N-body integration (REBOUND)
     """
-    a_pert, e_pert, rp = compute_perturbing_orbit_params(
-        v_infty=v_infty, b=b, m1=m1, m2=m2
-    )
-    t_int, f0 = compute_integration_params(a_pert=a_pert, e_pert=e_pert, rp=rp)
+    a_pert, e_pert, rp = get_perturber_orbit(v_infty=v_infty, b=b, m1=m1, m2=m2)
+    t_int, f0 = get_integration_window(a_pert=a_pert, e_pert=e_pert, rp=rp)
 
     idx = int(rng.integers(0, _MEAN_ANOMS_GRID.size))
     f_phase = convert_mean_to_true_anomaly(float(_MEAN_ANOMS_GRID[idx]), e)
@@ -209,40 +209,25 @@ def de_sim(
     return SimResult(delta_e_sim, delta_a_sim)
 
 
-@njit(cache=True, fastmath=True)
-def tidal_param(v_infty: float, b: float, a: float, m1: float, m2: float) -> float:
-    """
-    Tidal parameter := (pericenter radius of perturbing orbit) / (semi-major of planetary orbit)
-    """
-    params = compute_perturbing_orbit_params(v_infty=v_infty, b=b, m1=m1, m2=m2)
-    return params.rp / a
-
-
-@njit(cache=True, fastmath=True)
-def slow_param(v_infty: float, b: float, a: float, m1: float, m2: float) -> float:
-    """
-    Slow parameter := (integration time for perturbing orbit) / (period of planetary orbit)
-    """
-    params = compute_perturbing_orbit_params(v_infty=v_infty, b=b, m1=m1, m2=m2)
-    t_int, _ = compute_integration_params(params.a_pert, params.e_pert, params.rp)
-    t_per = math.sqrt(a**3 / (m1 + m2))
-    return t_int / t_per
-
-
 def is_analytic_valid(
     v_infty: float, b: float, a: float, m1: float, m2: float, **kwargs
 ) -> bool:
     """
-    Returns True if the tidal parameter > T_MIN *and* the slow parameter > S_MIN
+    Validate encounter parameters for analytic treatment.
+
+    Returns True if both approximations are satisfied:
+    - Tidal parameter (r_p / a) > T_MIN
+    - Slow parameter (t_int / t_per) > S_MIN
     """
-    return (
-        True
-        if (
-            tidal_param(v_infty=v_infty, b=b, a=a, m1=m1, m2=m2) > T_MIN
-            and slow_param(v_infty=v_infty, b=b, a=a, m1=m1, m2=m2) > S_MIN
-        )
-        else False
-    )
+    params = get_perturber_orbit(v_infty, b, m1, m2)
+
+    if params.rp / a <= T_MIN:
+        return False
+
+    t_int, _ = get_integration_window(params.a_pert, params.e_pert, params.rp)
+    t_per = math.sqrt(a**3 / (m1 + m2))
+
+    return t_int / t_per > S_MIN
 
 
 @njit(cache=True, fastmath=True)
@@ -269,46 +254,23 @@ def f(e: float) -> float:
 
 
 @njit(cache=True, fastmath=True)
-def de_tid_dt(e: float, a: float, m1: float, m2: float) -> float:
+def get_tidal_derivatives(e: float, a: float, m1: float, m2: float) -> TidalDerivatives:
     """
-    de/dt for tidal circularization (in Myr^-1)
+    Compute de/dt and da/dt for tidal circularization (in Myr^-1).
+
+    Returns: TidalDerivatives(de_dt, da_dt)
     """
     q = m2 / m1
-    n = 10**6 * np.sqrt(G * (1 + q) * m1 / a**3)  # per Myr
-    e_dot_tide = (
-        -21
-        / 2
-        * K_P
-        * TAU_P
-        * (n**2)
-        * (q**-1)
-        * (R_P / a) ** 5
-        * f(e)
-        * e
-        / (1 - e**2) ** (13 / 2)
-    )
-    return e_dot_tide
+    n = 10**6 * np.sqrt(G * (1 + q) * m1 / a**3)
+    e_sq = e * e
+    one_minus_e_sq = 1.0 - e_sq
 
+    common_factor = -21 * K_P * TAU_P * (n * n) / q * (R_P / a) ** 5 * f(e)
 
-@njit(cache=True, fastmath=True)
-def da_tid_dt(e: float, a: float, m1: float, m2: float) -> float:
-    """
-    da/dt for tidal circularization (in Myr^-1)
-    """
-    q = m2 / m1
-    n = 10**6 * np.sqrt(G * (1 + q) * m1 / a**3)  # per Myr
-    a_dot_tide = (
-        -21
-        * K_P
-        * TAU_P
-        * (n**2)
-        * (q**-1)
-        * (R_P / a) ** 5
-        * f(e)
-        * (a * e**2)
-        / (1 - e**2) ** (15 / 2)
-    )
-    return a_dot_tide
+    de_dt = common_factor * e / (one_minus_e_sq ** (13 / 2)) / 2
+    da_dt = common_factor * a * e_sq / (one_minus_e_sq ** (15 / 2))
+
+    return TidalDerivatives(de_dt, da_dt)
 
 
 @njit(cache=True, fastmath=True)
@@ -337,8 +299,9 @@ def tidal_effect(
     """
     n_cum = 0.0
     while n_cum < 1.0 and e > 1e-3:
-        dedn = de_tid_dt(e=e, a=a, m1=m1, m2=m2) * time_in_Myr
-        dadn = da_tid_dt(e=e, a=a, m1=m1, m2=m2) * time_in_Myr
+        derivs = get_tidal_derivatives(e, a, m1, m2)
+        dedn = derivs.de_dt * time_in_Myr
+        dadn = derivs.da_dt * time_in_Myr
         dn = get_dn(dedn, dadn, e, a, C, n_cum)
         n_cum += dn
         e += dedn * dn
