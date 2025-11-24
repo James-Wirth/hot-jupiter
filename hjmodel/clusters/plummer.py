@@ -4,7 +4,7 @@ An example density profile: a time-dependent Plummer profile for 47 Tuc
 
 import numpy as np
 
-from hjmodel.clusters import DensityProfile
+from hjmodel.clusters import DensityProfile, LocalEnvironment
 from hjmodel.config import AU_PER_PSC, G
 
 __all__ = ["Plummer"]
@@ -60,13 +60,25 @@ class Plummer(DensityProfile):
         a_scaled = self.a(t) * AU_PER_PSC
         return np.sqrt(G * self.M_t(t) / (6 * np.sqrt(r_scaled**2 + a_scaled**2)))
 
+    def get_mass_fraction_within_radius(self, r: float, t: float) -> float:
+        a_t = self.a(t)
+        r_scaled = r / a_t
+        return (r_scaled**3) / ((1 + r_scaled**2) ** 1.5)
+
     def get_radius(self, lagrange: float, t: float) -> float:
         a_t = self.a(t)
         r_scaled = (lagrange ** (2 / 3)) / (1 - lagrange ** (2 / 3))
         r_scaled = r_scaled**0.5
         return r_scaled * a_t
 
-    def get_mass_fraction_within_radius(self, r: float, t: float) -> float:
+    def get_local_environment(self, r: float, t: float) -> LocalEnvironment:
         a_t = self.a(t)
-        r_scaled = r / a_t
-        return (r_scaled**3) / ((1 + r_scaled**2) ** 1.5)
+
+        rho = (3 * self.M_fixed) / (4 * np.pi * a_t**3) * (1 + (r / a_t) ** 2) ** -2.5
+        n_tot = rho / self.M_avg / 1e6
+
+        r_scaled = r * AU_PER_PSC
+        a_scaled = a_t * AU_PER_PSC
+        sigma_v = np.sqrt(G * self.M_t(t) / (6 * np.sqrt(r_scaled**2 + a_scaled**2)))
+
+        return LocalEnvironment(n_tot=n_tot, sigma_v=sigma_v)
