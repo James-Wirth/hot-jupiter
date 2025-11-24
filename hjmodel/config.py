@@ -1,6 +1,16 @@
 import math
 from enum import IntEnum
 
+__all__ = [
+    "G",
+    "AU_PER_PSC",
+    "B_MAX",
+    "CIRCULARISATION_THRESHOLD_ECCENTRICITY",
+    "MAX_HJ_PERIOD",
+    "MAX_WJ_PERIOD",
+    "StopCode",
+]
+
 ## General constants
 G = 4 * math.pi**2  # Gravitational constant / natural units
 INIT_PHASES = 5000  # Number of mean anomalies to use in the planetary sampling

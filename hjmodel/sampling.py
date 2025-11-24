@@ -20,6 +20,8 @@ from hjmodel.config import (
     s2,
 )
 
+__all__ = ["SystemSampler", "EncounterSampler"]
+
 # Eccentricity sampling
 _E_RAYLEIGH_F_MAX = 1 - math.exp(-(E_INIT_MAX**2) / (2 * E_INIT_RMS**2))
 _E_RAYLEIGH_TWO_SIGMA_SQ = 2 * E_INIT_RMS**2
