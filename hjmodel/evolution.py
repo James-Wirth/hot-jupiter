@@ -10,6 +10,8 @@ from hjmodel.clusters import Cluster
 from hjmodel.config import CIRCULARISATION_THRESHOLD_ECCENTRICITY, NUM_CPUS, StopCode
 from hjmodel.sampling import EncounterSampler, SystemSampler
 
+__all__ = ["PlanetarySystem", "check_stopping_conditions"]
+
 logger = logging.getLogger(__name__)
 
 

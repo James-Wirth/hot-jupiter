@@ -7,6 +7,8 @@ import numpy as np
 from hjmodel.clusters import DensityProfile
 from hjmodel.config import AU_PER_PSC, G
 
+__all__ = ["Plummer"]
+
 _N0: float = 2.0e6
 _R0: float = 1.91
 _A: float = 6.991e-4

@@ -1,21 +1,33 @@
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from collections import namedtuple
 
 import numpy as np
 
-from hjmodel.clusters.profiles import DensityProfile
+__all__ = ["LocalEnvironment", "DensityProfile", "Cluster"]
 
 
-@dataclass
-class LocalEnvironment:
-    n_tot: float
-    sigma_v: float
+LocalEnvironment = namedtuple("LocalEnvironment", ["n_tot", "sigma_v"])
+
+
+class DensityProfile(ABC):
+    @abstractmethod
+    def get_number_density(self, r: float, t: float) -> float:
+        pass
+
+    @abstractmethod
+    def get_isotropic_velocity_dispersion(self, r: float, t: float) -> float:
+        pass
+
+    @abstractmethod
+    def get_radius(self, lagrange: float, t: float) -> float:
+        pass
+
+    @abstractmethod
+    def get_mass_fraction_within_radius(self, r: float, t: float) -> float:
+        pass
 
 
 class Cluster:
-    """
-    Wraps cluster methods for a given DensityProfile instance
-    """
-
     def __init__(self, profile: DensityProfile, r_max: float = 100):
         self.profile = profile
         self.r_max = r_max
@@ -43,9 +55,8 @@ class Cluster:
         )
 
     def get_lagrange_distribution(
-        self, n_samples: int, t: float, rng: np.random.Generator = None
+        self, n_samples: int, t: float, rng: np.random.Generator | None = None
     ) -> np.ndarray:
-
         if rng is None:
             rng = np.random.default_rng()
 

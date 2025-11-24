@@ -9,6 +9,8 @@ import pandas as pd
 
 from hjmodel.config import StopCode
 
+__all__ = ["Results"]
+
 logger = logging.getLogger(__name__)
 LabelOrEnum = Union[str, StopCode]
 
