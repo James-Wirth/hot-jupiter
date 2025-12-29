@@ -93,7 +93,6 @@ class PlanetarySystem:
 
         sampler.rng = np.random.default_rng(int(m1_seed))
         m1 = sampler.sample_m1()
-
         m2 = sampler.sample_m2()
 
         return cls(
@@ -128,6 +127,24 @@ class PlanetarySystem:
             for seed, lagrange in zip(system_seeds, lagrange_radii)
         )
 
+    def _check_stop(
+        self, t: float, R_td: float, R_hj: float, R_wj: float, total_time: float
+    ) -> bool:
+        self.stopping_condition = check_stopping_conditions(
+            self.e, self.a, t, R_td, R_hj, R_wj, total_time
+        )
+        return self.stopping_condition is not None
+
+    def _apply_encounter(self, encounter: dict, hybrid_switch: bool) -> None:
+        params = {**encounter, "e": self.e, "a": self.a, "m1": self.m1, "m2": self.m2}
+
+        if core.is_analytic_valid(**params) or not hybrid_switch:
+            self.e += core.compute_delta_e_analytic(**params)
+        else:
+            de, da = core.compute_delta_e_nbody(**params, rng=self.rng)
+            self.e += de
+            self.a += da
+
     def evolve(
         self,
         cluster: Cluster,
@@ -137,54 +154,35 @@ class PlanetarySystem:
     ) -> None:
 
         encounter_sampler = EncounterSampler(rng=self.rng)
-
         R_td, R_hj, R_wj = core.get_critical_radii(m1=self.m1, m2=self.m2)
         t = 0.0
-        iterations = 0
 
-        while t < total_time:
-            self.stopping_condition = check_stopping_conditions(
-                self.e, self.a, t, R_td, R_hj, R_wj, total_time
-            )
-            if self.stopping_condition is not None:
+        for iteration in range(max_iters):
+            if self._check_stop(t, R_td, R_hj, R_wj, total_time):
                 break
 
-            r = cluster.get_radius(lagrange=self.lagrange, t=t)
-            local_env = cluster.get_local_environment(r, t)
-            wt_time = encounter_sampler.get_waiting_time(local_env=local_env)
+            local_env = cluster.get_local_environment(
+                r=cluster.get_radius(lagrange=self.lagrange, t=t), t=t
+            )
 
+            wt_time = encounter_sampler.get_waiting_time(local_env=local_env)
             self.e, self.a = core.apply_tidal_effect(
                 e=self.e, a=self.a, m1=self.m1, m2=self.m2, time_in_Myr=wt_time
             )
             t = min(t + wt_time, total_time)
 
-            self.stopping_condition = check_stopping_conditions(
-                self.e, self.a, t, R_td, R_hj, R_wj, total_time
+            if self._check_stop(t, R_td, R_hj, R_wj, total_time):
+                break
+
+            self._apply_encounter(
+                encounter=encounter_sampler.sample_encounter(local_env=local_env),
+                hybrid_switch=hybrid_switch,
             )
-            if self.stopping_condition is not None:
-                break
-
-            kwargs = {
-                **encounter_sampler.sample_encounter(local_env=local_env),
-                "e": self.e,
-                "a": self.a,
-                "m1": self.m1,
-                "m2": self.m2,
-            }
-            if core.is_analytic_valid(**kwargs) or not hybrid_switch:
-                self.e += core.compute_delta_e_analytic(**kwargs)
-            else:
-                de, da = core.compute_delta_e_nbody(**kwargs, rng=self.rng)
-                self.e += de
-                self.a += da
-
-            iterations += 1
-            if iterations >= max_iters:
-                self.logger.warning(
-                    "Max iterations (%d) reached during evolution; breaking early.",
-                    max_iters,
-                )
-                break
+        else:
+            self.logger.warning(
+                "Max iterations (%d) reached during evolution; breaking early.",
+                max_iters,
+            )
 
         if self.stopping_condition is None:
             self.stopping_condition = StopCode.NM
