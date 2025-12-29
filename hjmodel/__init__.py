@@ -13,8 +13,8 @@ from more_itertools import chunked
 
 from hjmodel.clusters import Cluster
 from hjmodel.evolution import PlanetarySystem
+from hjmodel.io import DaskProcessor
 from hjmodel.results import Results
-from hjmodel.utils.dask import DaskProcessor
 
 __all__ = ["HJModel"]
 
