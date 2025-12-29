@@ -23,7 +23,6 @@ from hjmodel.config import (
 
 SimResult = namedtuple("SimResult", ["delta_e_sim", "delta_a_sim"])
 PerturbingOrbitParams = namedtuple("PerturbingOrbitParams", ["a_pert", "e_pert", "r_p"])
-IntegrationParams = namedtuple("IntegrationParams", ["t_int", "f0"])
 TidalDerivatives = namedtuple("TidalDerivatives", ["de_dt", "da_dt"])
 TidalEffectResult = namedtuple("TidalEffectResult", ["e", "a"])
 CriticalRadii = namedtuple("CriticalRadii", ["R_td", "R_hj", "R_wj"])
@@ -111,18 +110,24 @@ def get_perturber_orbit(
     return PerturbingOrbitParams(a_pert, e_pert, r_p)
 
 
-@njit(cache=True, fastmath=True)
-def get_integration_window(
-    a_pert: float, e_pert: float, r_p: float
-) -> IntegrationParams:
+@njit(cache=True, fastmath=True, inline="always")
+def _get_critical_true_anomaly(a_pert: float, e_pert: float, r_p: float) -> float:
     """
-    Compute integration time window and initial true anomaly for perturber.
+    Compute the critical true anomaly where the perturber enters/exits the interaction region.
     """
     r_crit = r_p / _XI_CBRT
     cos_theta = (1.0 / e_pert) * (((a_pert * (1.0 - e_pert * e_pert)) / r_crit) - 1.0)
     cos_theta = max(-1.0, min(1.0, cos_theta))
+    return math.acos(cos_theta)
 
-    theta_crit = math.acos(cos_theta)
+
+@njit(cache=True, fastmath=True)
+def get_integration_time(a_pert: float, e_pert: float, r_p: float) -> float:
+    """
+    Compute the total integration time for a perturber flyby.
+    """
+    theta_crit = _get_critical_true_anomaly(a_pert, e_pert, r_p)
+    cos_theta = math.cos(theta_crit)
 
     acosh_arg = (e_pert + cos_theta) / (1.0 + e_pert * cos_theta)
     if acosh_arg < 1.0:
@@ -131,7 +136,7 @@ def get_integration_window(
     hyp_anom = math.acosh(acosh_arg)
     half_time = (e_pert * math.sinh(hyp_anom) - hyp_anom) * (-a_pert) ** 1.5
 
-    return IntegrationParams(2.0 * half_time, -theta_crit)
+    return 2.0 * half_time
 
 
 @njit(cache=True, fastmath=True)
@@ -195,7 +200,9 @@ def compute_delta_e_nbody(
     Eccentricity excitation via full N-body integration (REBOUND)
     """
     a_pert, e_pert, r_p = get_perturber_orbit(v_infty=v_infty, b=b, m1=m1, m2=m2)
-    t_int, f0 = get_integration_window(a_pert=a_pert, e_pert=e_pert, r_p=r_p)
+
+    t_int = get_integration_time(a_pert=a_pert, e_pert=e_pert, r_p=r_p)
+    f0 = -_get_critical_true_anomaly(a_pert=a_pert, e_pert=e_pert, r_p=r_p)
 
     idx = int(rng.integers(0, _MEAN_ANOMS_GRID.size))
     f_phase = convert_mean_to_true_anomaly(float(_MEAN_ANOMS_GRID[idx]), e)
@@ -232,7 +239,7 @@ def is_analytic_valid(
     if params.r_p / a <= T_MIN:
         return False
 
-    t_int, _ = get_integration_window(params.a_pert, params.e_pert, params.r_p)
+    t_int = get_integration_time(params.a_pert, params.e_pert, params.r_p)
     t_per = math.sqrt(a**3 / (m1 + m2))
 
     return t_int / t_per > S_MIN
