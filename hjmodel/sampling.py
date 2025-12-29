@@ -127,9 +127,9 @@ class EncounterSampler(Sampler):
 
     def sample_orientation(self) -> Dict[str, float]:
         return {
-            "Omega": self.rng.random() * _TWO_PI,
-            "omega": self.rng.random() * _TWO_PI,
-            "inc": math.acos(1 - 2 * self.rng.random()),
+            "lan_angle": self.rng.random() * _TWO_PI,
+            "aop_angle": self.rng.random() * _TWO_PI,
+            "inc_angle": math.acos(1 - 2 * self.rng.random()),
         }
 
     def sample_m3(self) -> float:
@@ -152,7 +152,7 @@ class EncounterSampler(Sampler):
         return params
 
     def get_waiting_time(self, local_env: LocalEnvironment) -> float:
-        perts_per_Myr = core.get_perts_per_Myr(
+        perts_per_Myr = core.get_perturbation_rate(
             local_n_tot=local_env.n_tot, local_sigma_v=local_env.sigma_v
         )
         return self.rng.exponential(1.0 / perts_per_Myr)

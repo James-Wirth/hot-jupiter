@@ -153,7 +153,7 @@ class PlanetarySystem:
             local_env = cluster.get_local_environment(r, t)
             wt_time = encounter_sampler.get_waiting_time(local_env=local_env)
 
-            self.e, self.a = core.tidal_effect(
+            self.e, self.a = core.apply_tidal_effect(
                 e=self.e, a=self.a, m1=self.m1, m2=self.m2, time_in_Myr=wt_time
             )
             t = min(t + wt_time, total_time)
@@ -172,9 +172,9 @@ class PlanetarySystem:
                 "m2": self.m2,
             }
             if core.is_analytic_valid(**kwargs) or not hybrid_switch:
-                self.e += core.de_hr(**kwargs)
+                self.e += core.compute_delta_e_analytic(**kwargs)
             else:
-                de, da = core.de_sim(**kwargs, rng=self.rng)
+                de, da = core.compute_delta_e_nbody(**kwargs, rng=self.rng)
                 self.e += de
                 self.a += da
 
