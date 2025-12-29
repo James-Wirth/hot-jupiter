@@ -1,4 +1,4 @@
-from hjmodel.config import StopCode
+from hjmodel.evolution import StopCode
 
 
 def test_stopcode_lookup_by_name_and_id():
@@ -6,9 +6,3 @@ def test_stopcode_lookup_by_name_and_id():
     assert sc == StopCode.HJ
     sc2 = StopCode.from_id(sc.value)
     assert sc2 == StopCode.HJ
-
-
-def test_stopcode_hex_metadata():
-    assert hasattr(StopCode.HJ, "hex")
-    assert isinstance(StopCode.HJ.hex, str)
-    assert StopCode.HJ.hex != StopCode.WJ.hex

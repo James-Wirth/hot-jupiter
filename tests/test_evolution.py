@@ -1,8 +1,8 @@
 import pytest
 
 from hjmodel import core
-from hjmodel.config import CIRCULARISATION_THRESHOLD_ECCENTRICITY, StopCode
-from hjmodel.evolution import PlanetarySystem, check_stopping_conditions
+from hjmodel.config import CIRCULARISATION_THRESHOLD_ECCENTRICITY
+from hjmodel.evolution import PlanetarySystem, StopCode, check_stopping_conditions
 
 
 def test_check_stopping_conditions_various():

@@ -1,8 +1,15 @@
 import pandas as pd
 import pytest
 
-from hjmodel.config import StopCode
-from hjmodel.results import Results
+from hjmodel.evolution import StopCode
+from hjmodel.results import STOPCODE_COLORS, Results
+
+
+def test_stopcode_colors_complete():
+    for sc in StopCode:
+        assert sc in STOPCODE_COLORS
+        assert isinstance(STOPCODE_COLORS[sc], str)
+    assert STOPCODE_COLORS[StopCode.HJ] != STOPCODE_COLORS[StopCode.WJ]
 
 
 def test_compute_outcome_probabilities_normalization():

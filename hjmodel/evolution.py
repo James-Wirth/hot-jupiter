@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass, field
+from enum import IntEnum
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -7,10 +8,40 @@ from joblib import Parallel, cpu_count, delayed
 
 from hjmodel import core
 from hjmodel.clusters import Cluster
-from hjmodel.config import CIRCULARISATION_THRESHOLD_ECCENTRICITY, NUM_CPUS, StopCode
+from hjmodel.config import CIRCULARISATION_THRESHOLD_ECCENTRICITY, NUM_CPUS
 from hjmodel.sampling import EncounterSampler, SystemSampler
 
-__all__ = ["PlanetarySystem", "check_stopping_conditions"]
+__all__ = ["PlanetarySystem", "StopCode", "check_stopping_conditions"]
+
+
+class StopCode(IntEnum):
+    """
+    Stopping conditions for planetary system evolution:
+
+    - NM: No (significant) migration
+    - ION: Ionisation (planet ejected)
+    - TD: Tidal disruption
+    - HJ: Hot Jupiter formation
+    - WJ: Warm Jupiter formation
+    """
+
+    NM = 0
+    ION = 1
+    TD = 2
+    HJ = 3
+    WJ = 4
+
+    @classmethod
+    def from_id(cls, value: int) -> "StopCode":
+        return cls(value)
+
+    @classmethod
+    def from_name(cls, name: str) -> "StopCode":
+        try:
+            return getattr(cls, name)
+        except AttributeError as err:
+            raise ValueError(f"Invalid StopCode name: {name}") from err
+
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +55,6 @@ def check_stopping_conditions(
     R_wj: float,
     total_time: float,
 ) -> Optional[StopCode]:
-
     if e >= 1:
         return StopCode.ION
     if a * (1 - e) < R_td:
@@ -48,7 +78,6 @@ def _resolve_n_jobs(num_cpus: int) -> int:
 
 @dataclass
 class PlanetarySystem:
-
     e_init: float
     a_init: float
     m1: float
@@ -112,7 +141,6 @@ class PlanetarySystem:
         rng: np.random.Generator,
         num_cpus: int = NUM_CPUS,
     ) -> List["PlanetarySystem"]:
-
         lagrange_radii = cluster.get_lagrange_distribution(
             n_samples=n_samples, t=0, rng=rng
         )
@@ -152,12 +180,11 @@ class PlanetarySystem:
         hybrid_switch: bool = True,
         max_iters: int = 1_000_000,
     ) -> None:
-
         encounter_sampler = EncounterSampler(rng=self.rng)
         R_td, R_hj, R_wj = core.get_critical_radii(m1=self.m1, m2=self.m2)
         t = 0.0
 
-        for iteration in range(max_iters):
+        for _iteration in range(max_iters):
             if self._check_stop(t, R_td, R_hj, R_wj, total_time):
                 break
 
@@ -194,7 +221,6 @@ class PlanetarySystem:
         total_time: float,
         hybrid_switch: bool = True,
     ) -> Dict[str, float]:
-
         self.evolve(
             cluster=cluster,
             total_time=total_time,

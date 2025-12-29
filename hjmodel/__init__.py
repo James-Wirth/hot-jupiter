@@ -22,9 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class HJModel:
-
     def __init__(self, name: str, base_dir: Path = None):
-
         if base_dir is None:
             base_dir = Path(__file__).resolve().parent.parent / "data"
 
@@ -108,7 +106,6 @@ class HJModel:
         hybrid_switch: bool = True,
         seed: Optional[int] = None,
     ) -> None:
-
         if time < 0:
             raise ValueError("time must be >= 0")
         if num_systems <= 0:

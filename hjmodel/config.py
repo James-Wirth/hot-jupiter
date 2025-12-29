@@ -1,5 +1,4 @@
 import math
-from enum import IntEnum
 
 __all__ = [
     "G",
@@ -8,7 +7,6 @@ __all__ = [
     "CIRCULARISATION_THRESHOLD_ECCENTRICITY",
     "MAX_HJ_PERIOD",
     "MAX_WJ_PERIOD",
-    "StopCode",
 ]
 
 ## General constants
@@ -55,37 +53,3 @@ CIRCULARISATION_THRESHOLD_ECCENTRICITY = 1e-3
 
 # Hardware...
 NUM_CPUS = -1
-
-
-class StopCode(IntEnum):
-    """
-    This class encapsulates the key stopping conditions for the planetary system:
-    (i) No [significant] Migration
-    (ii) Ionisation
-    (iii) Tidal-Disription
-    (iv) Hot-Jupiter Formation
-    (v) Warm-Jupiter Formation
-    """
-
-    NM = (0, "#D3D3D3")
-    ION = (1, "#1b2a49")
-    TD = (2, "#769EAA")
-    HJ = (3, "#D62728")
-    WJ = (4, "#FF7F0E")
-
-    def __new__(cls, value, hexcolor):
-        obj = int.__new__(cls, value)
-        obj._value_ = value
-        obj.hex = hexcolor
-        return obj
-
-    @classmethod
-    def from_id(cls, value: int) -> "StopCode":
-        return cls(value)
-
-    @classmethod
-    def from_name(cls, name: str) -> "StopCode":
-        try:
-            return getattr(cls, name)
-        except AttributeError:
-            raise ValueError(f"Invalid StopCode name: {name}")

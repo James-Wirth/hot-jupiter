@@ -56,7 +56,6 @@ class Sampler:
 
 @dataclass(slots=True)
 class SystemSampler(Sampler):
-
     def sample_e_init(self) -> float:
         # Rayleigh distribution
         e_val = -1.0
@@ -110,7 +109,6 @@ _SQRT_TWO = math.sqrt(2.0)
 
 @dataclass(slots=True)
 class EncounterSampler(Sampler):
-
     override_b_max: float = B_MAX
 
     def sample_b(self) -> float:

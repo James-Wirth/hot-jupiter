@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 class DaskProcessor:
-
     def __init__(self, output_path: Path):
         self.output_path = Path(output_path)
         self.partition_dir = self.output_path.parent / "parquet_batches"

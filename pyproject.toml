@@ -12,11 +12,27 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["hjmodel"]
 
-[tool.isort]
-profile = "black"
-
-[tool.black]
-line-length = 88
-
 [tool.ruff]
 line-length = 88
+target-version = "py38"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes (unused imports, undefined names, etc.)
+    "I",      # isort (import sorting)
+    "UP",     # pyupgrade (modern Python syntax)
+    "B",      # flake8-bugbear (common bugs)
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B019",   # lru_cache on methods (intentional for caching filter results)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["hjmodel"]
+
+[tool.ruff.format]
+docstring-code-format = true

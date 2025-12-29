@@ -7,12 +7,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from hjmodel.config import StopCode
+from hjmodel.evolution import StopCode
 
 __all__ = ["Results"]
 
 logger = logging.getLogger(__name__)
 LabelOrEnum = Union[str, StopCode]
+
+STOPCODE_COLORS: Dict[StopCode, str] = {
+    StopCode.NM: "#D3D3D3",
+    StopCode.ION: "#1b2a49",
+    StopCode.TD: "#769EAA",
+    StopCode.HJ: "#D62728",
+    StopCode.WJ: "#FF7F0E",
+}
 
 
 class Results:
@@ -26,7 +34,9 @@ class Results:
     def __init__(self, df: pd.DataFrame):
         self.df = df.copy()
         self.id2label: Dict[int, str] = {sc.value: sc.name for sc in StopCode}
-        self.hex_by_id: Dict[int, str] = {sc.value: sc.hex for sc in StopCode}
+        self.hex_by_id: Dict[int, str] = {
+            sc.value: STOPCODE_COLORS[sc] for sc in StopCode
+        }
         self.valid_labels: List[str] = [sc.name for sc in StopCode]
 
     def _normalize_label(self, label: LabelOrEnum) -> StopCode:
@@ -34,10 +44,10 @@ class Results:
             return label
         try:
             return StopCode.from_name(label)
-        except ValueError:
+        except ValueError as err:
             raise ValueError(
                 f"Invalid outcome label: {label}. Valid keys: {self.valid_labels}"
-            )
+            ) from err
 
     def _normalize_labels(self, labels: List[LabelOrEnum]) -> Tuple[StopCode, ...]:
         return tuple(self._normalize_label(lbl) for lbl in labels)
@@ -50,7 +60,6 @@ class Results:
         sample_frac_items: Optional[Tuple[Tuple[str, float], ...]],
         r_range: Optional[Tuple[float, float]],
     ) -> pd.DataFrame:
-
         _df = self.df.copy()
         if include:
             stopcodes = tuple(self._normalize_label(lbl) for lbl in include)
@@ -71,9 +80,7 @@ class Results:
                 code = sc.value
                 group = _df[_df["stopping_condition"] == code]
                 parts.append(group.sample(frac=frac, random_state=0))
-            excluded_codes = [
-                self._normalize_label(lbl).value for lbl in sample_frac.keys()
-            ]
+            excluded_codes = [self._normalize_label(lbl).value for lbl in sample_frac]
             others = _df[~_df["stopping_condition"].isin(excluded_codes)]
             _df = pd.concat(parts + [others], ignore_index=True)
         return _df
@@ -85,7 +92,6 @@ class Results:
         sample_frac: Optional[Dict[LabelOrEnum, float]] = None,
         r_range: Optional[Tuple[float, float]] = None,
     ) -> pd.DataFrame:
-
         include_key = tuple(include) if include else None
         exclude_key = tuple(exclude) if exclude else None
         sample_frac_items = (
@@ -113,7 +119,6 @@ class Results:
         xrange: Tuple[float, float] = (1e-2, 1e3),
         yrange: Tuple[float, float] = (1, 1e5),
     ) -> None:
-
         _df = self.filter_outcomes(exclude=list(exclude)).assign(
             x=lambda d: d["final_a"], y=lambda d: 1 / (1 - d["final_e"])
         )
@@ -131,7 +136,7 @@ class Results:
             ax.scatter(
                 [],
                 [],
-                color=sc.hex,
+                color=STOPCODE_COLORS[sc],
                 label=sc.name,
                 s=10,
                 rasterized=True,
@@ -159,7 +164,7 @@ class Results:
             stopping_label=lambda d: d["stopping_condition"].map(self.id2label),
         )
         bins = np.logspace(np.log10(xrange[0]), np.log10(xrange[1]), 1000)
-        palette = {sc.name: sc.hex for sc in StopCode}
+        palette = {sc.name: STOPCODE_COLORS[sc] for sc in StopCode}
 
         sns.histplot(
             data=_df,
@@ -227,7 +232,6 @@ class Results:
         xrange: Tuple[float, float] = (0.5, 15),
         yrange: Tuple[float, float] = (0.01, 100),
     ) -> None:
-
         _df = self.filter_outcomes(
             include=list(conditions), sample_frac={"NM": 1 - drop_frac}
         )
@@ -260,7 +264,6 @@ class Results:
         r_range: Optional[Tuple[float, float]] = None,
         r_max: float = 100.0,
     ) -> Dict[str, float]:
-
         _df = self.df.copy()
         if r_range:
             _df = _df[_df["r"].between(r_range[0], r_range[1])]
@@ -270,7 +273,7 @@ class Results:
         label_to_id = {sc.name: sc.value for sc in StopCode}
         if total == 0:
             logger.warning("[compute_outcome_probabilities] empty filtered dataset.")
-            return {label: 0.0 for label in label_to_id.keys()}
+            return {label: 0.0 for label in label_to_id}
         return {
             label: len(_df[_df["stopping_condition"] == code]) / total
             for label, code in label_to_id.items()
@@ -282,7 +285,6 @@ class Results:
         feature: str,
         r_max: float = 100.0,
     ) -> List[float]:
-
         stopcodes = self._normalize_labels(outcomes)
         codes = [sc.value for sc in stopcodes]
         _df = self.df[
@@ -302,7 +304,6 @@ class Results:
         bins: int = 100,
         min_counts: int = 1000,
     ) -> Tuple[pd.Series, float, float]:
-
         data = self.df[label].abs()
         data = data[data > 0]
         if data.empty:
@@ -337,7 +338,6 @@ class Results:
         xrange: Tuple[float, float] = (1e-1, 1e1),
         yrange: Tuple[float, float] = (1e-4, 1),
     ) -> None:
-
         self.project_radius()
         hist, _, _ = self.radius_histogram()
         if hist.empty:

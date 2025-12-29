@@ -1,7 +1,7 @@
 import pandas as pd
 
 from hjmodel.__init__ import HJModel
-from hjmodel.config import StopCode
+from hjmodel.evolution import StopCode
 
 
 def test_caching_and_invalidation(tmp_path):
