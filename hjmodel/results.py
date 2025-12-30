@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import logging
 from functools import lru_cache
-from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -12,9 +13,9 @@ from hjmodel.evolution import StopCode
 __all__ = ["Results"]
 
 logger = logging.getLogger(__name__)
-LabelOrEnum = Union[str, StopCode]
+LabelOrEnum = str | StopCode
 
-STOPCODE_COLORS: Dict[StopCode, str] = {
+STOPCODE_COLORS: dict[StopCode, str] = {
     StopCode.NM: "#D3D3D3",
     StopCode.ION: "#1b2a49",
     StopCode.TD: "#769EAA",
@@ -25,19 +26,32 @@ STOPCODE_COLORS: Dict[StopCode, str] = {
 
 class Results:
     """
-    Wrapper for the outputting/plotting results of the HJModel run.
-    An instance of this class can be accessed via the HJModel.results property in the HJModel class
+    Wrapper for analyzing and plotting HJModel simulation results.
 
-    Contains methods for outputting the outcome probabilites and plotting useful figures.
+    Provides filtering, statistical analysis, and visualization methods
+    for simulation outcomes. Accessible via the HJModel.results property.
+
+    Attributes:
+        df: DataFrame containing simulation results.
+        id2label: Mapping from StopCode values to names.
+        hex_by_id: Mapping from StopCode values to hex colors.
+        valid_labels: List of valid StopCode names.
     """
 
     def __init__(self, df: pd.DataFrame):
+        """
+        Initialize Results with a simulation DataFrame.
+
+        Args:
+            df: DataFrame containing simulation results with columns including
+                'stopping_condition', 'r', 'final_e', 'final_a', etc.
+        """
         self.df = df.copy()
-        self.id2label: Dict[int, str] = {sc.value: sc.name for sc in StopCode}
-        self.hex_by_id: Dict[int, str] = {
+        self.id2label: dict[int, str] = {sc.value: sc.name for sc in StopCode}
+        self.hex_by_id: dict[int, str] = {
             sc.value: STOPCODE_COLORS[sc] for sc in StopCode
         }
-        self.valid_labels: List[str] = [sc.name for sc in StopCode]
+        self.valid_labels: list[str] = [sc.name for sc in StopCode]
 
     def _normalize_label(self, label: LabelOrEnum) -> StopCode:
         if isinstance(label, StopCode):
@@ -49,16 +63,16 @@ class Results:
                 f"Invalid outcome label: {label}. Valid keys: {self.valid_labels}"
             ) from err
 
-    def _normalize_labels(self, labels: List[LabelOrEnum]) -> Tuple[StopCode, ...]:
+    def _normalize_labels(self, labels: list[LabelOrEnum]) -> tuple[StopCode, ...]:
         return tuple(self._normalize_label(lbl) for lbl in labels)
 
     @lru_cache(maxsize=128)
     def _filter_cached(
         self,
-        include: Optional[Tuple[LabelOrEnum, ...]],
-        exclude: Optional[Tuple[LabelOrEnum, ...]],
-        sample_frac_items: Optional[Tuple[Tuple[str, float], ...]],
-        r_range: Optional[Tuple[float, float]],
+        include: tuple[LabelOrEnum, ...] | None,
+        exclude: tuple[LabelOrEnum, ...] | None,
+        sample_frac_items: tuple[tuple[str, float], ...] | None,
+        r_range: tuple[float, float] | None,
     ) -> pd.DataFrame:
         _df = self.df.copy()
         if include:
@@ -87,11 +101,23 @@ class Results:
 
     def filter_outcomes(
         self,
-        include: Optional[List[LabelOrEnum]] = None,
-        exclude: Optional[List[LabelOrEnum]] = None,
-        sample_frac: Optional[Dict[LabelOrEnum, float]] = None,
-        r_range: Optional[Tuple[float, float]] = None,
+        include: list[LabelOrEnum] | None = None,
+        exclude: list[LabelOrEnum] | None = None,
+        sample_frac: dict[LabelOrEnum, float] | None = None,
+        r_range: tuple[float, float] | None = None,
     ) -> pd.DataFrame:
+        """
+        Filter simulation results by outcome type, radius, or sampling fraction.
+
+        Args:
+            include: List of outcomes to include (e.g., ['HJ', 'WJ']).
+            exclude: List of outcomes to exclude.
+            sample_frac: Dictionary mapping outcomes to sampling fractions.
+            r_range: Tuple (r_min, r_max) to filter by radius.
+
+        Returns:
+            Filtered DataFrame.
+        """
         include_key = tuple(include) if include else None
         exclude_key = tuple(exclude) if exclude else None
         sample_frac_items = (
@@ -115,10 +141,19 @@ class Results:
     def plot_phase_plane(
         self,
         ax: plt.Axes,
-        exclude: Tuple[LabelOrEnum, ...] = ("ION",),
-        xrange: Tuple[float, float] = (1e-2, 1e3),
-        yrange: Tuple[float, float] = (1, 1e5),
+        exclude: tuple[LabelOrEnum, ...] = ("ION",),
+        xrange: tuple[float, float] = (1e-2, 1e3),
+        yrange: tuple[float, float] = (1, 1e5),
     ) -> None:
+        """
+        Plot the phase plane (a vs 1/(1-e)) colored by outcome.
+
+        Args:
+            ax: Matplotlib axes to plot on.
+            exclude: Outcomes to exclude from the plot.
+            xrange: X-axis limits (semi-major axis in au).
+            yrange: Y-axis limits (1/(1-e)).
+        """
         _df = self.filter_outcomes(exclude=list(exclude)).assign(
             x=lambda d: d["final_a"], y=lambda d: 1 / (1 - d["final_e"])
         )
@@ -153,10 +188,19 @@ class Results:
     def plot_stopping_cdf(
         self,
         ax: plt.Axes,
-        include: Tuple[LabelOrEnum, ...] = ("ION", "TD", "HJ"),
-        xrange: Tuple[float, float] = (1e-3, 11.99),
-        yrange: Tuple[float, float] = (0.01, 1),
+        include: tuple[LabelOrEnum, ...] = ("ION", "TD", "HJ"),
+        xrange: tuple[float, float] = (1e-3, 11.99),
+        yrange: tuple[float, float] = (0.01, 1),
     ) -> None:
+        """
+        Plot cumulative distribution of stopping times by outcome.
+
+        Args:
+            ax: Matplotlib axes to plot on.
+            include: Outcomes to include in the plot.
+            xrange: X-axis limits (stopping time in Gyr).
+            yrange: Y-axis limits (CDF).
+        """
         import seaborn as sns
 
         _df = self.filter_outcomes(include=list(include)).assign(
@@ -193,10 +237,19 @@ class Results:
     def plot_sma_distribution(
         self,
         ax: plt.Axes,
-        conditions: Tuple[LabelOrEnum, ...] = ("NM", "TD", "HJ", "WJ"),
+        conditions: tuple[LabelOrEnum, ...] = ("NM", "TD", "HJ", "WJ"),
         cumulative: bool = True,
         drop_frac: float = 0,
     ) -> None:
+        """
+        Plot the semi-major axis distribution for specified outcomes.
+
+        Args:
+            ax: Matplotlib axes to plot on.
+            conditions: Outcomes to include in the plot.
+            cumulative: If True, plot cumulative distribution.
+            drop_frac: Fraction of NM outcomes to drop for clarity.
+        """
         import seaborn as sns
 
         _df = self.filter_outcomes(
@@ -227,11 +280,21 @@ class Results:
     def plot_sma_scatter(
         self,
         ax: plt.Axes,
-        conditions: Tuple[LabelOrEnum, ...] = ("NM", "TD", "HJ", "WJ"),
+        conditions: tuple[LabelOrEnum, ...] = ("NM", "TD", "HJ", "WJ"),
         drop_frac: float = 0.95,
-        xrange: Tuple[float, float] = (0.5, 15),
-        yrange: Tuple[float, float] = (0.01, 100),
+        xrange: tuple[float, float] = (0.5, 15),
+        yrange: tuple[float, float] = (0.01, 100),
     ) -> None:
+        """
+        Plot scatter of semi-major axis vs cluster radius by outcome.
+
+        Args:
+            ax: Matplotlib axes to plot on.
+            conditions: Outcomes to include in the plot.
+            drop_frac: Fraction of NM outcomes to drop for clarity.
+            xrange: X-axis limits (radius in pc).
+            yrange: Y-axis limits (semi-major axis in au).
+        """
         _df = self.filter_outcomes(
             include=list(conditions), sample_frac={"NM": 1 - drop_frac}
         )
@@ -261,9 +324,19 @@ class Results:
 
     def compute_outcome_probabilities(
         self,
-        r_range: Optional[Tuple[float, float]] = None,
+        r_range: tuple[float, float] | None = None,
         r_max: float = 100.0,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
+        """
+        Compute the probability of each outcome type.
+
+        Args:
+            r_range: Tuple (r_min, r_max) to filter by radius.
+            r_max: Maximum radius if r_range not specified.
+
+        Returns:
+            Dictionary mapping outcome names to probabilities.
+        """
         _df = self.df.copy()
         if r_range:
             _df = _df[_df["r"].between(r_range[0], r_range[1])]
@@ -281,10 +354,21 @@ class Results:
 
     def get_statistics_for_outcomes(
         self,
-        outcomes: List[LabelOrEnum],
+        outcomes: list[LabelOrEnum],
         feature: str,
         r_max: float = 100.0,
-    ) -> List[float]:
+    ) -> list[float]:
+        """
+        Get values of a feature for specified outcomes.
+
+        Args:
+            outcomes: List of outcomes to include.
+            feature: Column name to extract.
+            r_max: Maximum radius for filtering.
+
+        Returns:
+            List of feature values.
+        """
         stopcodes = self._normalize_labels(outcomes)
         codes = [sc.value for sc in stopcodes]
         _df = self.df[
@@ -292,7 +376,15 @@ class Results:
         ]
         return _df[feature].tolist()
 
-    def project_radius(self, random_seed: Optional[int] = None) -> None:
+    def project_radius(self, random_seed: int | None = None) -> None:
+        """
+        Project 3D radii onto a random 2D plane.
+
+        Adds an 'r_proj' column to the DataFrame representing projected radius.
+
+        Args:
+            random_seed: Random seed for reproducibility.
+        """
         rng = np.random.default_rng(random_seed)
         self.df = self.df.assign(
             r_proj=lambda d: d["r"] * np.sin(rng.random(d.shape[0]) * 2 * np.pi)
@@ -303,7 +395,18 @@ class Results:
         label: str = "r_proj",
         bins: int = 100,
         min_counts: int = 1000,
-    ) -> Tuple[pd.Series, float, float]:
+    ) -> tuple[pd.Series, float, float]:
+        """
+        Compute outcome probabilities binned by radius.
+
+        Args:
+            label: Column to bin by (default 'r_proj').
+            bins: Number of bins.
+            min_counts: Minimum counts per bin to include.
+
+        Returns:
+            Tuple of (grouped Series, min bin edge, max bin edge).
+        """
         data = self.df[label].abs()
         data = data[data > 0]
         if data.empty:
@@ -335,9 +438,18 @@ class Results:
         self,
         ax: plt.Axes,
         linestyle: str = "solid",
-        xrange: Tuple[float, float] = (1e-1, 1e1),
-        yrange: Tuple[float, float] = (1e-4, 1),
+        xrange: tuple[float, float] = (1e-1, 1e1),
+        yrange: tuple[float, float] = (1e-4, 1),
     ) -> None:
+        """
+        Plot outcome probability as a function of projected radius.
+
+        Args:
+            ax: Matplotlib axes to plot on.
+            linestyle: Line style for the plot.
+            xrange: X-axis limits (projected radius in pc).
+            yrange: Y-axis limits (probability).
+        """
         self.project_radius()
         hist, _, _ = self.radius_histogram()
         if hist.empty:

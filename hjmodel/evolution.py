@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Dict, List, Optional
 
 import numpy as np
 from joblib import Parallel, cpu_count, delayed
@@ -12,6 +13,8 @@ from hjmodel.config import CIRCULARISATION_THRESHOLD_ECCENTRICITY, NUM_CPUS
 from hjmodel.sampling import EncounterSampler, SystemSampler
 
 __all__ = ["PlanetarySystem", "StopCode", "check_stopping_conditions"]
+
+logger = logging.getLogger(__name__)
 
 
 class StopCode(IntEnum):
@@ -32,18 +35,36 @@ class StopCode(IntEnum):
     WJ = 4
 
     @classmethod
-    def from_id(cls, value: int) -> "StopCode":
+    def from_id(cls, value: int) -> StopCode:
+        """
+        Create a StopCode from its integer value.
+
+        Args:
+            value: Integer value of the stopping condition.
+
+        Returns:
+            Corresponding StopCode enum member.
+        """
         return cls(value)
 
     @classmethod
-    def from_name(cls, name: str) -> "StopCode":
+    def from_name(cls, name: str) -> StopCode:
+        """
+        Create a StopCode from its string name.
+
+        Args:
+            name: Name of the stopping condition (e.g., 'HJ', 'ION').
+
+        Returns:
+            Corresponding StopCode enum member.
+
+        Raises:
+            ValueError: If name is not a valid StopCode name.
+        """
         try:
             return getattr(cls, name)
         except AttributeError as err:
             raise ValueError(f"Invalid StopCode name: {name}") from err
-
-
-logger = logging.getLogger(__name__)
 
 
 def check_stopping_conditions(
@@ -54,7 +75,25 @@ def check_stopping_conditions(
     R_hj: float,
     R_wj: float,
     total_time: float,
-) -> Optional[StopCode]:
+) -> StopCode | None:
+    """
+    Evaluate stopping conditions for a planetary system.
+
+    Checks for ionisation, tidal disruption, hot Jupiter formation,
+    warm Jupiter formation, or no migration in that priority order.
+
+    Args:
+        e: Current orbital eccentricity.
+        a: Current semi-major axis (au).
+        t: Current simulation time (Myr).
+        R_td: Tidal disruption radius (au).
+        R_hj: Hot Jupiter threshold radius (au).
+        R_wj: Warm Jupiter threshold radius (au).
+        total_time: Total simulation duration (Myr).
+
+    Returns:
+        StopCode if a stopping condition is met, None otherwise.
+    """
     if e >= 1:
         return StopCode.ION
     if a * (1 - e) < R_td:
@@ -78,6 +117,26 @@ def _resolve_n_jobs(num_cpus: int) -> int:
 
 @dataclass
 class PlanetarySystem:
+    """
+    Represents a planetary system undergoing dynamical evolution in a cluster.
+
+    Tracks orbital parameters (eccentricity, semi-major axis) as the system
+    evolves under stellar encounters and tidal effects. Determines the final
+    outcome based on stopping conditions.
+
+    Attributes:
+        e_init: Initial orbital eccentricity.
+        a_init: Initial semi-major axis (au).
+        m1: Host star mass (M_sun).
+        m2: Planet mass (M_sun).
+        lagrange: Lagrangian mass fraction determining cluster position.
+        seed: Random seed for reproducibility.
+        e: Current orbital eccentricity.
+        a: Current semi-major axis (au).
+        stopping_condition: Final outcome of the evolution.
+        stopping_time: Time when stopping condition was reached (Myr).
+    """
+
     e_init: float
     a_init: float
     m1: float
@@ -116,7 +175,17 @@ class PlanetarySystem:
         )
 
     @classmethod
-    def sample(cls, lagrange: float, system_seed: int) -> "PlanetarySystem":
+    def sample(cls, lagrange: float, system_seed: int) -> PlanetarySystem:
+        """
+        Create a planetary system by sampling initial parameters.
+
+        Args:
+            lagrange: Lagrangian mass fraction for cluster position.
+            system_seed: Random seed for reproducibility.
+
+        Returns:
+            A new PlanetarySystem with sampled initial conditions.
+        """
         system_rng = np.random.default_rng(system_seed)
         e_seed, a_seed, m1_seed = system_rng.integers(0, 2**32 - 1, size=3)
 
@@ -146,7 +215,19 @@ class PlanetarySystem:
         cluster: Cluster,
         rng: np.random.Generator,
         num_cpus: int = NUM_CPUS,
-    ) -> List["PlanetarySystem"]:
+    ) -> list[PlanetarySystem]:
+        """
+        Sample multiple planetary systems in parallel.
+
+        Args:
+            n_samples: Number of systems to sample.
+            cluster: Cluster for determining Lagrangian positions.
+            rng: Random number generator for reproducibility.
+            num_cpus: Number of CPUs for parallel processing. -1 uses all but one.
+
+        Returns:
+            List of sampled PlanetarySystem instances.
+        """
         lagrange_radii = cluster.get_lagrange_distribution(
             n_samples=n_samples, t=0, rng=rng
         )
@@ -162,12 +243,32 @@ class PlanetarySystem:
         )
 
     def _check_stop(self, t: float, total_time: float) -> bool:
+        """
+        Check if a stopping condition has been reached.
+
+        Args:
+            t: Current simulation time (Myr).
+            total_time: Total simulation duration (Myr).
+
+        Returns:
+            True if a stopping condition is met, False otherwise.
+        """
         self.stopping_condition = check_stopping_conditions(
             self.e, self.a, t, self.R_td, self.R_hj, self.R_wj, total_time
         )
         return self.stopping_condition is not None
 
     def _apply_encounter(self, encounter: dict, hybrid_switch: bool) -> None:
+        """
+        Apply the effect of a stellar encounter on the orbital parameters.
+
+        Uses analytic approximation when valid, otherwise falls back to
+        N-body integration if hybrid_switch is enabled.
+
+        Args:
+            encounter: Dictionary of encounter parameters.
+            hybrid_switch: If True, use N-body when analytic is invalid.
+        """
         params = {**encounter, "e": self.e, "a": self.a, "m1": self.m1, "m2": self.m2}
 
         if core.is_analytic_valid(**params) or not hybrid_switch:
@@ -184,6 +285,19 @@ class PlanetarySystem:
         hybrid_switch: bool = True,
         max_iters: int = 1_000_000,
     ) -> None:
+        """
+        Evolve the planetary system through stellar encounters and tidal effects.
+
+        Simulates the dynamical evolution by alternating between waiting for
+        encounters, applying tidal circularization, and processing encounters.
+        Continues until a stopping condition is met or max_iters is reached.
+
+        Args:
+            cluster: Cluster environment for local density and velocity.
+            total_time: Total simulation duration (Myr).
+            hybrid_switch: If True, use N-body for close encounters.
+            max_iters: Maximum number of iteration cycles.
+        """
         encounter_sampler = EncounterSampler(rng=self.rng)
         t = 0.0
 
@@ -225,7 +339,21 @@ class PlanetarySystem:
         cluster: Cluster,
         total_time: float,
         hybrid_switch: bool = True,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
+        """
+        Evolve the system and return results as a dictionary.
+
+        Convenience method that calls evolve() and returns the results
+        in a format suitable for DataFrame construction.
+
+        Args:
+            cluster: Cluster environment.
+            total_time: Total simulation duration (Myr).
+            hybrid_switch: If True, use N-body for close encounters.
+
+        Returns:
+            Dictionary of simulation results.
+        """
         self.evolve(
             cluster=cluster,
             total_time=total_time,
@@ -233,7 +361,18 @@ class PlanetarySystem:
         )
         return self.to_result_dict(cluster=cluster, total_time=total_time)
 
-    def to_result_dict(self, cluster: Cluster, total_time: float) -> Dict[str, float]:
+    def to_result_dict(self, cluster: Cluster, total_time: float) -> dict[str, float]:
+        """
+        Convert the system state to a results dictionary.
+
+        Args:
+            cluster: Cluster for computing final radius.
+            total_time: Total simulation time for radius calculation.
+
+        Returns:
+            Dictionary with keys: 'r', 'e_init', 'a_init', 'm1', 'm2',
+            'final_e', 'final_a', 'stopping_condition', 'stopping_time'.
+        """
         r = cluster.get_radius(lagrange=self.lagrange, t=total_time)
         return {
             "r": r,

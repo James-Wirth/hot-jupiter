@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import gc
 import logging
 import math
 import os
 import re
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -22,7 +23,29 @@ logger = logging.getLogger(__name__)
 
 
 class HJModel:
-    def __init__(self, name: str, base_dir: Path = None):
+    """
+    Main orchestrator for Hot Jupiter formation simulations.
+
+    Manages simulation runs, persists results to disk, and provides
+    access to analysis utilities via the results property.
+
+    Attributes:
+        name: Experiment name (used for directory naming).
+        base_dir: Base directory for storing experiment data.
+        exp_path: Full path to the experiment directory.
+        time: Simulation duration of the most recent run (Myr).
+        num_systems: Number of systems in the most recent run.
+        path: Path to the most recent results file.
+    """
+
+    def __init__(self, name: str, base_dir: Path | None = None):
+        """
+        Initialize the HJModel with an experiment name.
+
+        Args:
+            name: Unique name for this experiment.
+            base_dir: Base directory for data storage. Defaults to ../data.
+        """
         if base_dir is None:
             base_dir = Path(__file__).resolve().parent.parent / "data"
 
@@ -33,14 +56,20 @@ class HJModel:
 
         self.time: float = 0.0
         self.num_systems: int = 0
-        self.path: Optional[str] = None
+        self.path: str | None = None
 
-        self._df: Optional[pd.DataFrame] = None
-        self._results_cached: Optional[Results] = None
+        self._df: pd.DataFrame | None = None
+        self._results_cached: Results | None = None
 
         logger.info("Initialized HJModel for experiment '%s'.", self.name)
 
     def _load_all_runs(self) -> pd.DataFrame:
+        """
+        Load and concatenate results from all runs in the experiment.
+
+        Returns:
+            DataFrame containing all results with 'run_id' column added.
+        """
         result_files = sorted(self.exp_path.glob("run_*/results.parquet"))
         if not result_files:
             return pd.DataFrame()
@@ -66,21 +95,42 @@ class HJModel:
 
     @property
     def df(self) -> pd.DataFrame:
+        """
+        Get the combined DataFrame of all simulation results.
+
+        Lazily loads and caches results from disk on first access.
+        """
         if self._df is None:
             self._df = self._load_all_runs()
         return self._df
 
-    def invalidate_cache(self):
+    def invalidate_cache(self) -> None:
+        """
+        Clear cached results, forcing reload on next access.
+
+        Call after adding new runs to see updated results.
+        """
         self._df = None
         self._results_cached = None
 
     @property
     def results(self) -> Results:
+        """
+        Get the Results analysis object.
+
+        Lazily creates and caches a Results instance on first access.
+        """
         if self._results_cached is None:
             self._results_cached = Results(self.df)
         return self._results_cached
 
     def _allocate_new_run_dir(self) -> Path:
+        """
+        Create a new numbered run directory.
+
+        Returns:
+            Path to the newly created run directory.
+        """
         existing = [
             d
             for d in self.exp_path.iterdir()
@@ -104,8 +154,26 @@ class HJModel:
         cluster: Cluster,
         num_batches: int = 10,
         hybrid_switch: bool = True,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> None:
+        """
+        Execute a simulation run with the specified parameters.
+
+        Samples planetary systems, evolves them through stellar encounters
+        and tidal effects, and saves results to disk.
+
+        Args:
+            time: Total simulation duration (Myr).
+            num_systems: Number of planetary systems to simulate.
+            cluster: Cluster environment for the simulation.
+            num_batches: Number of batches for parallel processing.
+            hybrid_switch: If True, use N-body for close encounters.
+            seed: Random seed for reproducibility.
+
+        Raises:
+            ValueError: If time, num_systems, or num_batches are invalid.
+            RuntimeError: If the output file is not created.
+        """
         if time < 0:
             raise ValueError("time must be >= 0")
         if num_systems <= 0:

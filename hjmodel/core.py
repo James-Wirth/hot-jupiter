@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import math
 from collections import namedtuple
@@ -49,7 +51,14 @@ def _make_canonical_angle(x: float) -> float:
 @njit(cache=True, fastmath=True)
 def _solve_kepler_ecc_anom(mean_anom: float, e: float) -> float:
     """
-    Halley's method for solving the Kepler equation
+    Solve the Kepler equation using Halley's method.
+
+    Args:
+        mean_anom: Mean anomaly (radians).
+        e: Orbital eccentricity.
+
+    Returns:
+        Eccentric anomaly (radians).
     """
     mean_anom = _make_canonical_angle(mean_anom)
     sign = 1.0 if math.sin(mean_anom) >= 0.0 else -1.0
@@ -88,6 +97,16 @@ def _make_true_anomaly_from_ecc_anom(ecc_anom: float, e: float) -> float:
 
 @njit(cache=True, fastmath=True)
 def convert_mean_to_true_anomaly(mean_anom: float, e: float) -> float:
+    """
+    Convert mean anomaly to true anomaly.
+
+    Args:
+        mean_anom: Mean anomaly (radians).
+        e: Orbital eccentricity.
+
+    Returns:
+        True anomaly (radians).
+    """
     ecc_anom = _solve_kepler_ecc_anom(mean_anom, e)
     return _make_true_anomaly_from_ecc_anom(ecc_anom, e)
 
@@ -98,6 +117,16 @@ def get_perturber_orbit(
 ) -> PerturbingOrbitParams:
     """
     Compute orbital parameters for a hyperbolic perturber.
+
+    Args:
+        v_infty: Velocity at infinity (au/yr).
+        b: Impact parameter (au).
+        m1: Host star mass (M_sun).
+        m2: Planet mass (M_sun).
+
+    Returns:
+        PerturbingOrbitParams containing semi-major axis, eccentricity,
+        and periapsis distance.
     """
     _MIN_VINF = 1e-12
     if v_infty <= 0.0 or not math.isfinite(v_infty):
@@ -114,6 +143,14 @@ def get_perturber_orbit(
 def _get_critical_true_anomaly(a_pert: float, e_pert: float, r_p: float) -> float:
     """
     Compute the critical true anomaly where the perturber enters/exits the interaction region.
+
+    Args:
+        a_pert: Perturber semi-major axis (au).
+        e_pert: Perturber eccentricity.
+        r_p: Periapsis distance (au).
+
+    Returns:
+        Critical true anomaly (radians).
     """
     r_crit = r_p / _XI_CBRT
     cos_theta = (1.0 / e_pert) * (((a_pert * (1.0 - e_pert * e_pert)) / r_crit) - 1.0)
@@ -125,6 +162,14 @@ def _get_critical_true_anomaly(a_pert: float, e_pert: float, r_p: float) -> floa
 def get_integration_time(a_pert: float, e_pert: float, r_p: float) -> float:
     """
     Compute the total integration time for a perturber flyby.
+
+    Args:
+        a_pert: Perturber semi-major axis (au).
+        e_pert: Perturber eccentricity.
+        r_p: Periapsis distance (au).
+
+    Returns:
+        Total integration time (yr).
     """
     theta_crit = _get_critical_true_anomaly(a_pert, e_pert, r_p)
     cos_theta = math.cos(theta_crit)
@@ -153,7 +198,24 @@ def compute_delta_e_analytic(
     m3: float,
 ) -> float:
     """
-    Eccentricity excitation via Heggie-Rasio (1986) approximation
+    Compute eccentricity change using the Heggie-Rasio (1986) analytic approximation.
+
+    Valid for distant, slow encounters where the tidal and slow approximations hold.
+
+    Args:
+        v_infty: Velocity at infinity (au/yr).
+        b: Impact parameter (au).
+        lan_angle: Longitude of ascending node (radians).
+        inc_angle: Inclination angle (radians).
+        aop_angle: Argument of periapsis (radians).
+        e: Current orbital eccentricity.
+        a: Current semi-major axis (au).
+        m1: Host star mass (M_sun).
+        m2: Planet mass (M_sun).
+        m3: Perturber mass (M_sun).
+
+    Returns:
+        Change in eccentricity (delta_e).
     """
     m_total = m1 + m2 + m3
     params = get_perturber_orbit(v_infty, b, m1, m2)
@@ -197,7 +259,26 @@ def compute_delta_e_nbody(
     rng: np.random.Generator,
 ) -> SimResult:
     """
-    Eccentricity excitation via full N-body integration (REBOUND)
+    Compute eccentricity and semi-major axis changes via N-body integration.
+
+    Uses REBOUND to perform a full 3-body integration for close encounters
+    where the analytic approximation is invalid.
+
+    Args:
+        v_infty: Velocity at infinity (au/yr).
+        b: Impact parameter (au).
+        lan_angle: Longitude of ascending node (radians).
+        inc_angle: Inclination angle (radians).
+        aop_angle: Argument of periapsis (radians).
+        e: Current orbital eccentricity.
+        a: Current semi-major axis (au).
+        m1: Host star mass (M_sun).
+        m2: Planet mass (M_sun).
+        m3: Perturber mass (M_sun).
+        rng: Random number generator for sampling initial orbital phase.
+
+    Returns:
+        SimResult containing delta_e_sim and delta_a_sim.
     """
     a_pert, e_pert, r_p = get_perturber_orbit(v_infty=v_infty, b=b, m1=m1, m2=m2)
 
@@ -230,9 +311,21 @@ def is_analytic_valid(
     """
     Validate encounter parameters for analytic treatment.
 
-    Returns True if both approximations are satisfied:
-    - Tidal parameter (r_p / a) > T_MIN
-    - Slow parameter (t_int / t_per) > S_MIN
+    Checks whether both the tidal and slow approximations are satisfied
+    for using the Heggie-Rasio analytic formula.
+
+    Args:
+        v_infty: Velocity at infinity (au/yr).
+        b: Impact parameter (au).
+        a: Current semi-major axis (au).
+        m1: Host star mass (M_sun).
+        m2: Planet mass (M_sun).
+        **kwargs: Additional keyword arguments (ignored).
+
+    Returns:
+        True if both conditions are satisfied:
+        - Tidal parameter (r_p / a) > T_MIN
+        - Slow parameter (t_int / t_per) > S_MIN
     """
     params = get_perturber_orbit(v_infty, b, m1, m2)
 
@@ -248,7 +341,16 @@ def is_analytic_valid(
 @njit(cache=True, fastmath=True)
 def get_tidal_f_factor(e: float) -> float:
     """
-    Helper function for get_tidal_derivatives
+    Compute the f(e) factor for tidal circularization.
+
+    This polynomial approximation captures the eccentricity dependence
+    of tidal dissipation rates.
+
+    Args:
+        e: Orbital eccentricity.
+
+    Returns:
+        Tidal factor f(e).
     """
     e2 = e * e
     e4 = e2 * e2
@@ -271,9 +373,16 @@ def get_tidal_f_factor(e: float) -> float:
 @njit(cache=True, fastmath=True)
 def get_tidal_derivatives(e: float, a: float, m1: float, m2: float) -> TidalDerivatives:
     """
-    Compute de/dt and da/dt for tidal circularization (in Myr^-1).
+    Compute time derivatives of eccentricity and semi-major axis due to tidal dissipation.
 
-    Returns: TidalDerivatives(de_dt, da_dt)
+    Args:
+        e: Orbital eccentricity.
+        a: Semi-major axis (au).
+        m1: Host star mass (M_sun).
+        m2: Planet mass (M_sun).
+
+    Returns:
+        TidalDerivatives containing de_dt and da_dt (both in Myr^-1).
     """
     mass_ratio = m2 / m1
     mean_motion = 10**6 * np.sqrt(G * (1 + mass_ratio) * m1 / a**3)
@@ -301,7 +410,21 @@ def get_tidal_step_size(
     dedn: float, dadn: float, e: float, a: float, step_factor: float, n_cum: float
 ) -> float:
     """
-    A sufficiently small step size for the tidal circularization integration
+    Compute an adaptive step size for tidal circularization integration.
+
+    Ensures the step is small enough to accurately capture the evolution
+    while not exceeding the remaining integration interval.
+
+    Args:
+        dedn: Derivative of eccentricity with respect to normalized time.
+        dadn: Derivative of semi-major axis with respect to normalized time.
+        e: Current eccentricity.
+        a: Current semi-major axis (au).
+        step_factor: Maximum fractional change per step.
+        n_cum: Cumulative normalized time elapsed (0 to 1).
+
+    Returns:
+        Step size in normalized time units.
     """
     e_safe = e if abs(e) > _EPS16 else _EPS16
     a_safe = a if abs(a) > _EPS16 else _EPS16
@@ -323,7 +446,21 @@ def apply_tidal_effect(
     step_factor: float = 0.01,
 ) -> TidalEffectResult:
     """
-    The new eccentricity (e) and semi-major axis (a) after tidal circularization after time_in_Myr
+    Apply tidal circularization to update orbital parameters.
+
+    Integrates the tidal evolution equations over the specified time interval
+    using an adaptive Euler method.
+
+    Args:
+        e: Initial orbital eccentricity.
+        a: Initial semi-major axis (au).
+        m1: Host star mass (M_sun).
+        m2: Planet mass (M_sun).
+        time_in_Myr: Duration of tidal evolution (Myr).
+        step_factor: Maximum fractional change per step. Default: 0.01.
+
+    Returns:
+        TidalEffectResult containing updated eccentricity and semi-major axis.
     """
     n_cum = 0.0
     while n_cum < 1.0 and e > 1e-3:
@@ -340,7 +477,17 @@ def apply_tidal_effect(
 @njit(cache=True, fastmath=True)
 def get_critical_radii(m1: float, m2: float) -> CriticalRadii:
     """
-    The critical orbital separations for tidal-disruption, HJ formation and WJ formation
+    Compute critical orbital radii for stopping condition evaluation.
+
+    Calculates the tidal disruption radius, hot Jupiter threshold,
+    and warm Jupiter threshold based on stellar and planetary masses.
+
+    Args:
+        m1: Host star mass (M_sun).
+        m2: Planet mass (M_sun).
+
+    Returns:
+        CriticalRadii containing R_td, R_hj, and R_wj (all in au).
     """
     R_td = ETA * R_P * (m1 / m2) ** (1 / 3)
     R_hj = (MAX_HJ_PERIOD**2 * (m1 + m2)) ** (1 / 3)
@@ -351,7 +498,14 @@ def get_critical_radii(m1: float, m2: float) -> CriticalRadii:
 @njit(cache=True, fastmath=True)
 def get_perturbation_rate(local_n_tot: float, local_sigma_v: float) -> float:
     """
-    Average perturbation rate (in inverse Myr)
+    Compute the average stellar encounter rate.
+
+    Args:
+        local_n_tot: Local stellar number density (stars per pc^3 per 10^6).
+        local_sigma_v: Local velocity dispersion (au/yr).
+
+    Returns:
+        Encounter rate (Myr^-1).
     """
     _ADJUSTED_GAMMA = 3.21
     return (

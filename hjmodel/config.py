@@ -1,16 +1,40 @@
-import math
-
 __all__ = [
+    # General constants
     "G",
+    "INIT_PHASES",
+    "XI",
+    "T_MIN",
+    "S_MIN",
+    # Unit conversions
     "AU_PER_PSC",
+    # Sampling parameters
     "B_MAX",
-    "CIRCULARISATION_THRESHOLD_ECCENTRICITY",
+    "M_MIN",
+    "M_MAX",
+    "M_BR",
+    "A_MIN",
+    "A_BR",
+    "A_MAX",
+    "s1",
+    "s2",
+    # Tidal circularization
+    "K_P",
+    "TAU_P",
+    "R_P",
+    "ETA",
+    # Initial eccentricity distribution
+    "E_INIT_RMS",
+    "E_INIT_MAX",
+    # Stopping condition parameters
     "MAX_HJ_PERIOD",
     "MAX_WJ_PERIOD",
+    "CIRCULARISATION_THRESHOLD_ECCENTRICITY",
+    # Hardware
+    "NUM_CPUS",
 ]
 
 ## General constants
-G = 4 * math.pi**2  # Gravitational constant / natural units
+G = 4 * 3.141592653589793**2  # Gravitational constant / natural units
 INIT_PHASES = 5000  # Number of mean anomalies to use in the planetary sampling
 XI = 1e-4  # Parameter used to truncate the encounter integration
 
