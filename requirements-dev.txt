@@ -1,8 +1,6 @@
 pytest
 pytest-cov
 
-black
-isort
 ruff
 pre-commit
 
