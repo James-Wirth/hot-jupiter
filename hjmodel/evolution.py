@@ -88,6 +88,9 @@ class PlanetarySystem:
     rng: np.random.Generator = field(init=False, repr=False)
     e: float = field(init=False)
     a: float = field(init=False)
+    R_td: float = field(init=False, repr=False)
+    R_hj: float = field(init=False, repr=False)
+    R_wj: float = field(init=False, repr=False)
     stopping_condition: StopCode = field(init=False)
     stopping_time: float = field(init=False)
     logger: logging.LoggerAdapter = field(init=False, repr=False)
@@ -96,6 +99,9 @@ class PlanetarySystem:
         self.rng = np.random.default_rng(self.seed)
         self.e = float(self.e_init)
         self.a = float(self.a_init)
+        self.R_td, self.R_hj, self.R_wj = core.get_critical_radii(
+            m1=self.m1, m2=self.m2
+        )
         self.stopping_condition = StopCode.NM
         self.stopping_time = 0.0
         self.logger = logging.LoggerAdapter(
@@ -155,11 +161,9 @@ class PlanetarySystem:
             for seed, lagrange in zip(system_seeds, lagrange_radii)
         )
 
-    def _check_stop(
-        self, t: float, R_td: float, R_hj: float, R_wj: float, total_time: float
-    ) -> bool:
+    def _check_stop(self, t: float, total_time: float) -> bool:
         self.stopping_condition = check_stopping_conditions(
-            self.e, self.a, t, R_td, R_hj, R_wj, total_time
+            self.e, self.a, t, self.R_td, self.R_hj, self.R_wj, total_time
         )
         return self.stopping_condition is not None
 
@@ -181,11 +185,10 @@ class PlanetarySystem:
         max_iters: int = 1_000_000,
     ) -> None:
         encounter_sampler = EncounterSampler(rng=self.rng)
-        R_td, R_hj, R_wj = core.get_critical_radii(m1=self.m1, m2=self.m2)
         t = 0.0
 
-        for _iteration in range(max_iters):
-            if self._check_stop(t, R_td, R_hj, R_wj, total_time):
+        for _ in range(max_iters):
+            if self._check_stop(t, total_time):
                 break
 
             local_env = cluster.get_local_environment(
@@ -193,12 +196,13 @@ class PlanetarySystem:
             )
 
             wt_time = encounter_sampler.get_waiting_time(local_env=local_env)
+            t = min(t + wt_time, total_time)
+
             self.e, self.a = core.apply_tidal_effect(
                 e=self.e, a=self.a, m1=self.m1, m2=self.m2, time_in_Myr=wt_time
             )
-            t = min(t + wt_time, total_time)
 
-            if self._check_stop(t, R_td, R_hj, R_wj, total_time):
+            if self._check_stop(t, total_time):
                 break
 
             self._apply_encounter(
@@ -213,6 +217,7 @@ class PlanetarySystem:
 
         if self.stopping_condition is None:
             self.stopping_condition = StopCode.NM
+
         self.stopping_time = t
 
     def run(
