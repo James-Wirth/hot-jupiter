@@ -212,7 +212,7 @@ class HJModel:
                     prefer="processes",
                     batch_size="auto",
                 )(
-                    delayed(PlanetarySystem.run)(ps, cluster, time, hybrid_switch)
+                    delayed(PlanetarySystem.run)(ps, time, cluster, hybrid_switch)
                     for ps in batch
                 )
                 partition_df = pd.DataFrame(results)

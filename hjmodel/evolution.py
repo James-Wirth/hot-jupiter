@@ -74,7 +74,7 @@ def check_stopping_conditions(
     R_td: float,
     R_hj: float,
     R_wj: float,
-    total_time: float,
+    time: float,
 ) -> StopCode | None:
     """
     Evaluate stopping conditions for a planetary system.
@@ -89,7 +89,7 @@ def check_stopping_conditions(
         R_td: Tidal disruption radius (au).
         R_hj: Hot Jupiter threshold radius (au).
         R_wj: Warm Jupiter threshold radius (au).
-        total_time: Total simulation duration (Myr).
+        time: Total simulation duration (Myr).
 
     Returns:
         StopCode if a stopping condition is met, None otherwise.
@@ -98,11 +98,9 @@ def check_stopping_conditions(
         return StopCode.ION
     if a * (1 - e) < R_td:
         return StopCode.TD
-    if a < R_hj and (e <= CIRCULARISATION_THRESHOLD_ECCENTRICITY or t >= total_time):
+    if a < R_hj and (e <= CIRCULARISATION_THRESHOLD_ECCENTRICITY or t >= time):
         return StopCode.HJ
-    if R_hj < a < R_wj and (
-        e <= CIRCULARISATION_THRESHOLD_ECCENTRICITY or t >= total_time
-    ):
+    if R_hj < a < R_wj and (e <= CIRCULARISATION_THRESHOLD_ECCENTRICITY or t >= time):
         return StopCode.WJ
     if e <= CIRCULARISATION_THRESHOLD_ECCENTRICITY:
         return StopCode.NM
@@ -242,19 +240,19 @@ class PlanetarySystem:
             for seed, lagrange in zip(system_seeds, lagrange_radii)
         )
 
-    def _check_stop(self, t: float, total_time: float) -> bool:
+    def _check_stop(self, t: float, time: float) -> bool:
         """
         Check if a stopping condition has been reached.
 
         Args:
             t: Current simulation time (Myr).
-            total_time: Total simulation duration (Myr).
+            time: Total simulation duration (Myr).
 
         Returns:
             True if a stopping condition is met, False otherwise.
         """
         self.stopping_condition = check_stopping_conditions(
-            self.e, self.a, t, self.R_td, self.R_hj, self.R_wj, total_time
+            self.e, self.a, t, self.R_td, self.R_hj, self.R_wj, time
         )
         return self.stopping_condition is not None
 
@@ -280,8 +278,8 @@ class PlanetarySystem:
 
     def evolve(
         self,
+        time: float,
         cluster: Cluster,
-        total_time: float,
         hybrid_switch: bool = True,
         max_iters: int = 1_000_000,
     ) -> None:
@@ -293,8 +291,8 @@ class PlanetarySystem:
         Continues until a stopping condition is met or max_iters is reached.
 
         Args:
+            time: Total simulation duration (Myr).
             cluster: Cluster environment for local density and velocity.
-            total_time: Total simulation duration (Myr).
             hybrid_switch: If True, use N-body for close encounters.
             max_iters: Maximum number of iteration cycles.
         """
@@ -302,7 +300,7 @@ class PlanetarySystem:
         t = 0.0
 
         for _ in range(max_iters):
-            if self._check_stop(t, total_time):
+            if self._check_stop(t, time):
                 break
 
             local_env = cluster.get_local_environment(
@@ -310,13 +308,13 @@ class PlanetarySystem:
             )
 
             wt_time = encounter_sampler.get_waiting_time(local_env=local_env)
-            t = min(t + wt_time, total_time)
+            t = min(t + wt_time, time)
 
             self.e, self.a = core.apply_tidal_effect(
                 e=self.e, a=self.a, m1=self.m1, m2=self.m2, time_in_Myr=wt_time
             )
 
-            if self._check_stop(t, total_time):
+            if self._check_stop(t, time):
                 break
 
             self._apply_encounter(
@@ -336,8 +334,8 @@ class PlanetarySystem:
 
     def run(
         self,
+        time: float,
         cluster: Cluster,
-        total_time: float,
         hybrid_switch: bool = True,
     ) -> dict[str, float]:
         """
@@ -347,33 +345,33 @@ class PlanetarySystem:
         in a format suitable for DataFrame construction.
 
         Args:
+            time: Total simulation duration (Myr).
             cluster: Cluster environment.
-            total_time: Total simulation duration (Myr).
             hybrid_switch: If True, use N-body for close encounters.
 
         Returns:
             Dictionary of simulation results.
         """
         self.evolve(
+            time=time,
             cluster=cluster,
-            total_time=total_time,
             hybrid_switch=hybrid_switch,
         )
-        return self.to_result_dict(cluster=cluster, total_time=total_time)
+        return self.to_result_dict(time=time, cluster=cluster)
 
-    def to_result_dict(self, cluster: Cluster, total_time: float) -> dict[str, float]:
+    def to_result_dict(self, time: float, cluster: Cluster) -> dict[str, float]:
         """
         Convert the system state to a results dictionary.
 
         Args:
+            time: Total simulation time for radius calculation.
             cluster: Cluster for computing final radius.
-            total_time: Total simulation time for radius calculation.
 
         Returns:
             Dictionary with keys: 'r', 'e_init', 'a_init', 'm1', 'm2',
             'final_e', 'final_a', 'stopping_condition', 'stopping_time'.
         """
-        r = cluster.get_radius(lagrange=self.lagrange, t=total_time)
+        r = cluster.get_radius(lagrange=self.lagrange, t=time)
         return {
             "r": r,
             "e_init": self.e_init,
