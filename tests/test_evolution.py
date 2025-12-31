@@ -8,11 +8,11 @@ from hjmodel.evolution import PlanetarySystem, StopCode, check_stopping_conditio
 def test_check_stopping_conditions_various():
     m1, m2 = 1.0, 1e-3
     R_td, R_hj, R_wj = core.get_critical_radii(m1=m1, m2=m2)
-    total_time = 10.0
+    time = 10.0
 
     # Ionisation
     code = check_stopping_conditions(
-        e=1.0, a=10.0, t=0.0, R_td=R_td, R_hj=R_hj, R_wj=R_wj, total_time=total_time
+        e=1.0, a=10.0, t=0.0, R_td=R_td, R_hj=R_hj, R_wj=R_wj, time=time
     )
     assert code == StopCode.ION
 
@@ -20,7 +20,7 @@ def test_check_stopping_conditions_various():
     e = 0.1
     a = (R_td / (1 - e)) * 0.9
     code = check_stopping_conditions(
-        e=e, a=a, t=0.0, R_td=R_td, R_hj=R_hj, R_wj=R_wj, total_time=total_time
+        e=e, a=a, t=0.0, R_td=R_td, R_hj=R_hj, R_wj=R_wj, time=time
     )
     assert code == StopCode.TD
 
@@ -28,21 +28,21 @@ def test_check_stopping_conditions_various():
     e = CIRCULARISATION_THRESHOLD_ECCENTRICITY / 2
     a = R_hj * 0.9
     code = check_stopping_conditions(
-        e=e, a=a, t=0.0, R_td=R_td, R_hj=R_hj, R_wj=R_wj, total_time=total_time
+        e=e, a=a, t=0.0, R_td=R_td, R_hj=R_hj, R_wj=R_wj, time=time
     )
     assert code == StopCode.HJ
 
     # Warm Jupiter
     a = (R_hj + R_wj) / 2
     code = check_stopping_conditions(
-        e=e, a=a, t=0.0, R_td=R_td, R_hj=R_hj, R_wj=R_wj, total_time=total_time
+        e=e, a=a, t=0.0, R_td=R_td, R_hj=R_hj, R_wj=R_wj, time=time
     )
     assert code == StopCode.WJ
 
     # No migration
     a = R_wj * 2
     code = check_stopping_conditions(
-        e=e, a=a, t=0.0, R_td=R_td, R_hj=R_hj, R_wj=R_wj, total_time=total_time
+        e=e, a=a, t=0.0, R_td=R_td, R_hj=R_hj, R_wj=R_wj, time=time
     )
     assert code == StopCode.NM
 
