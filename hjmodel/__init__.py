@@ -33,8 +33,6 @@ class HJModel:
         name: Experiment name (used for directory naming).
         base_dir: Base directory for storing experiment data.
         exp_path: Full path to the experiment directory.
-        time: Simulation duration of the most recent run (Myr).
-        num_systems: Number of systems in the most recent run.
         path: Path to the most recent results file.
     """
 
@@ -54,8 +52,6 @@ class HJModel:
         self.exp_path = self.base_dir / self.name
         self.exp_path.mkdir(parents=True, exist_ok=True)
 
-        self.time: float = 0.0
-        self.num_systems: int = 0
         self.path: str | None = None
 
         self._df: pd.DataFrame | None = None
@@ -181,17 +177,14 @@ class HJModel:
         if num_batches <= 0:
             raise ValueError("num_batches must be > 0")
 
-        self.time = time
-        self.num_systems = num_systems
-
         run_dir = self._allocate_new_run_dir()
         self.path = str(run_dir / "results.parquet")
 
         logger.info(
             "Evaluating %d systems over %d partitions (t = %s Myr) for experiment %s",
-            self.num_systems,
+            num_systems,
             num_batches,
-            self.time,
+            time,
             self.name,
         )
 
@@ -219,7 +212,7 @@ class HJModel:
                     prefer="processes",
                     batch_size="auto",
                 )(
-                    delayed(PlanetarySystem.run)(ps, cluster, self.time, hybrid_switch)
+                    delayed(PlanetarySystem.run)(ps, cluster, time, hybrid_switch)
                     for ps in batch
                 )
                 partition_df = pd.DataFrame(results)
