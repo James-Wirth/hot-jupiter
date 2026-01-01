@@ -107,8 +107,8 @@ def convert_mean_to_true_anomaly(mean_anom: float, e: float) -> float:
     Returns:
         True anomaly (radians).
     """
-    ecc_anom = _solve_kepler_ecc_anom(mean_anom, e)
-    return _make_true_anomaly_from_ecc_anom(ecc_anom, e)
+    ecc_anom = _solve_kepler_ecc_anom(mean_anom=mean_anom, e=e)
+    return _make_true_anomaly_from_ecc_anom(ecc_anom=ecc_anom, e=e)
 
 
 @njit(cache=True, fastmath=True)
@@ -175,7 +175,7 @@ def get_integration_time(
     Returns:
         Total integration time (yr).
     """
-    theta_crit = _get_critical_true_anomaly(a_pert, e_pert, r_p)
+    theta_crit = _get_critical_true_anomaly(a_pert=a_pert, e_pert=e_pert, r_p=r_p)
     cos_theta = math.cos(theta_crit)
 
     acosh_arg = (e_pert + cos_theta) / (1.0 + e_pert * cos_theta)
@@ -224,7 +224,7 @@ def compute_delta_e_analytic(
         Change in eccentricity (delta_e).
     """
     m_total = m1 + m2 + m3
-    params = get_perturber_orbit(v_infty, b, m1, m2)
+    params = get_perturber_orbit(v_infty=v_infty, b=b, m1=m1, m2=m2)
 
     mass_factor = (
         e * math.sqrt(max(0.0, 1.0 - e * e)) * (m3 / math.sqrt((m1 + m2) * m_total))
@@ -292,7 +292,7 @@ def compute_delta_e_nbody(
     f0 = -_get_critical_true_anomaly(a_pert=a_pert, e_pert=e_pert, r_p=r_p)
 
     idx = int(rng.integers(0, _MEAN_ANOMS_GRID.size))
-    f_phase = convert_mean_to_true_anomaly(float(_MEAN_ANOMS_GRID[idx]), e)
+    f_phase = convert_mean_to_true_anomaly(mean_anom=float(_MEAN_ANOMS_GRID[idx]), e=e)
 
     sim = rebound.Simulation()
     sim.G = G
@@ -334,12 +334,14 @@ def is_analytic_valid(
         - Tidal parameter (r_p / a) > T_MIN
         - Slow parameter (t_int / t_per) > S_MIN
     """
-    params = get_perturber_orbit(v_infty, b, m1, m2)
+    params = get_perturber_orbit(v_infty=v_infty, b=b, m1=m1, m2=m2)
 
     if params.r_p / a <= T_MIN:
         return False
 
-    t_int = get_integration_time(params.a_pert, params.e_pert, params.r_p, m1, m2)
+    t_int = get_integration_time(
+        a_pert=params.a_pert, e_pert=params.e_pert, r_p=params.r_p, m1=m1, m2=m2
+    )
     t_per = math.sqrt(a**3 / (m1 + m2))
 
     return t_int / t_per > S_MIN
@@ -471,14 +473,16 @@ def apply_tidal_effect(
     """
     n_cum = 0.0
     while n_cum < 1.0 and e > 1e-3:
-        derivs = get_tidal_derivatives(e, a, m1, m2)
+        derivs = get_tidal_derivatives(e=e, a=a, m1=m1, m2=m2)
         dedn = derivs.de_dt * time_in_Myr
         dadn = derivs.da_dt * time_in_Myr
-        dn = get_tidal_step_size(dedn, dadn, e, a, step_factor, n_cum)
+        dn = get_tidal_step_size(
+            dedn=dedn, dadn=dadn, e=e, a=a, step_factor=step_factor, n_cum=n_cum
+        )
         n_cum += dn
         e += dedn * dn
         a += dadn * dn
-    return TidalEffectResult(e, a)
+    return TidalEffectResult(e=e, a=a)
 
 
 @njit(cache=True, fastmath=True)

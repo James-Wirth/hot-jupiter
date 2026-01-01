@@ -234,9 +234,9 @@ class PlanetarySystem:
         def _make_system(system_seed: int, lagrange: float) -> PlanetarySystem:
             return cls.sample(lagrange=lagrange, system_seed=int(system_seed))
 
-        n_jobs = _resolve_n_jobs(num_cpus)
+        n_jobs = _resolve_n_jobs(num_cpus=num_cpus)
         return Parallel(n_jobs=n_jobs)(
-            delayed(_make_system)(int(seed), float(lagrange))
+            delayed(_make_system)(system_seed=int(seed), lagrange=float(lagrange))
             for seed, lagrange in zip(system_seeds, lagrange_radii)
         )
 
@@ -252,7 +252,13 @@ class PlanetarySystem:
             True if a stopping condition is met, False otherwise.
         """
         self.stopping_condition = check_stopping_conditions(
-            self.e, self.a, t, self.R_td, self.R_hj, self.R_wj, time
+            e=self.e,
+            a=self.a,
+            t=t,
+            R_td=self.R_td,
+            R_hj=self.R_hj,
+            R_wj=self.R_wj,
+            time=time,
         )
         return self.stopping_condition is not None
 
@@ -300,7 +306,7 @@ class PlanetarySystem:
         t = 0.0
 
         for _ in range(max_iters):
-            if self._check_stop(t, time):
+            if self._check_stop(t=t, time=time):
                 break
 
             local_env = cluster.get_local_environment(
@@ -314,7 +320,7 @@ class PlanetarySystem:
                 e=self.e, a=self.a, m1=self.m1, m2=self.m2, time_in_Myr=wt_time
             )
 
-            if self._check_stop(t, time):
+            if self._check_stop(t=t, time=time):
                 break
 
             self._apply_encounter(
