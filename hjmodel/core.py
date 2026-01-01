@@ -159,7 +159,9 @@ def _get_critical_true_anomaly(a_pert: float, e_pert: float, r_p: float) -> floa
 
 
 @njit(cache=True, fastmath=True)
-def get_integration_time(a_pert: float, e_pert: float, r_p: float) -> float:
+def get_integration_time(
+    a_pert: float, e_pert: float, r_p: float, m1: float, m2: float
+) -> float:
     """
     Compute the total integration time for a perturber flyby.
 
@@ -167,6 +169,8 @@ def get_integration_time(a_pert: float, e_pert: float, r_p: float) -> float:
         a_pert: Perturber semi-major axis (au).
         e_pert: Perturber eccentricity.
         r_p: Periapsis distance (au).
+        m1: Host star mass (M_sun).
+        m2: Planet mass (M_sun).
 
     Returns:
         Total integration time (yr).
@@ -179,7 +183,9 @@ def get_integration_time(a_pert: float, e_pert: float, r_p: float) -> float:
         acosh_arg = 1.0
 
     hyp_anom = math.acosh(acosh_arg)
-    half_time = (e_pert * math.sinh(hyp_anom) - hyp_anom) * (-a_pert) ** 1.5
+    half_time = (e_pert * math.sinh(hyp_anom) - hyp_anom) * math.sqrt(
+        (-a_pert) ** 3 / (G * (m1 + m2))
+    )
 
     return 2.0 * half_time
 
@@ -282,13 +288,14 @@ def compute_delta_e_nbody(
     """
     a_pert, e_pert, r_p = get_perturber_orbit(v_infty=v_infty, b=b, m1=m1, m2=m2)
 
-    t_int = get_integration_time(a_pert=a_pert, e_pert=e_pert, r_p=r_p)
+    t_int = get_integration_time(a_pert=a_pert, e_pert=e_pert, r_p=r_p, m1=m1, m2=m2)
     f0 = -_get_critical_true_anomaly(a_pert=a_pert, e_pert=e_pert, r_p=r_p)
 
     idx = int(rng.integers(0, _MEAN_ANOMS_GRID.size))
     f_phase = convert_mean_to_true_anomaly(float(_MEAN_ANOMS_GRID[idx]), e)
 
     sim = rebound.Simulation()
+    sim.G = G
     sim.add(m=m1)
     sim.add(m=m2, a=a, e=e, f=f_phase)
     sim.add(
@@ -332,7 +339,7 @@ def is_analytic_valid(
     if params.r_p / a <= T_MIN:
         return False
 
-    t_int = get_integration_time(params.a_pert, params.e_pert, params.r_p)
+    t_int = get_integration_time(params.a_pert, params.e_pert, params.r_p, m1, m2)
     t_per = math.sqrt(a**3 / (m1 + m2))
 
     return t_int / t_per > S_MIN
