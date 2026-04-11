@@ -387,7 +387,8 @@ class Results:
         """
         rng = np.random.default_rng(random_seed)
         self.df = self.df.assign(
-            r_proj=lambda d: d["r"] * np.sin(rng.random(d.shape[0]) * 2 * np.pi)
+            r_proj=lambda d: d["r"]
+            * np.sqrt(1 - rng.uniform(-1, 1, size=d.shape[0]) ** 2)
         )
 
     def radius_histogram(
