@@ -1,7 +1,6 @@
 pytest
 pytest-cov
 
-ruff
 pre-commit
 
 numpy==1.26.4

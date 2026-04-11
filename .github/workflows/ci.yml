@@ -26,10 +26,8 @@ jobs:
       - name: Install project
         run: pip install -e .
 
-      - name: Run linters
-        run: |
-          ruff check .
-          ruff format --check .
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.1
 
       - name: Run tests with coverage
         run: |
