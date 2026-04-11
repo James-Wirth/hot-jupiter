@@ -177,6 +177,8 @@ class Cluster:
         Returns:
             LocalEnvironment containing number density and velocity dispersion.
         """
+        if hasattr(self.profile, "get_local_environment"):
+            return self.profile.get_local_environment(r, t)
         return LocalEnvironment(
             n_tot=self.get_number_density(r, t),
             sigma_v=self.get_isotropic_velocity_dispersion(r, t),
