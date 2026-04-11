@@ -414,35 +414,20 @@ def get_tidal_derivatives(e: float, a: float, m1: float, m2: float) -> TidalDeri
     return TidalDerivatives(de_dt, da_dt)
 
 
+_E_FLOOR = 1e-3
+
+
 @njit(cache=True, fastmath=True)
-def get_tidal_step_size(
-    dedn: float, dadn: float, e: float, a: float, step_factor: float, n_cum: float
+def _adaptive_dt(
+    de_dt: float, da_dt: float, e: float, a: float, step_factor: float
 ) -> float:
-    """
-    Compute an adaptive step size for tidal circularization integration.
-
-    Ensures the step is small enough to accurately capture the evolution
-    while not exceeding the remaining integration interval.
-
-    Args:
-        dedn: Derivative of eccentricity with respect to normalized time.
-        dadn: Derivative of semi-major axis with respect to normalized time.
-        e: Current eccentricity.
-        a: Current semi-major axis (au).
-        step_factor: Maximum fractional change per step.
-        n_cum: Cumulative normalized time elapsed (0 to 1).
-
-    Returns:
-        Step size in normalized time units.
-    """
-    e_safe = e if abs(e) > _EPS16 else _EPS16
-    a_safe = a if abs(a) > _EPS16 else _EPS16
-    rel_rate_e = abs(dedn) / e_safe
-    rel_rate_a = abs(dadn) / a_safe
-    max_rel_rate = rel_rate_e if rel_rate_e >= rel_rate_a else rel_rate_a
-    step = step_factor / max_rel_rate if max_rel_rate > 0.0 else 1.0
-    remaining = 1.0 - n_cum
-    return step if step <= remaining else remaining
+    """Compute the largest dt such that neither e nor a changes by more than step_factor."""
+    rel_rate_e = abs(de_dt) / max(abs(e), _EPS16)
+    rel_rate_a = abs(da_dt) / max(abs(a), _EPS16)
+    max_rel_rate = max(rel_rate_e, rel_rate_a)
+    if max_rel_rate > 0.0:
+        return step_factor / max_rel_rate
+    return np.inf
 
 
 @njit(cache=True, fastmath=True)
@@ -452,13 +437,10 @@ def apply_tidal_effect(
     m1: float,
     m2: float,
     time_in_Myr: float,
-    step_factor: float = 0.01,
+    step_factor: float = 0.05,
 ) -> TidalEffectResult:
     """
-    Apply tidal circularization to update orbital parameters.
-
-    Integrates the tidal evolution equations over the specified time interval
-    using an adaptive Euler method.
+    Integrate tidal circularization using adaptive RK2 (midpoint method).
 
     Args:
         e: Initial orbital eccentricity.
@@ -466,22 +448,28 @@ def apply_tidal_effect(
         m1: Host star mass (M_sun).
         m2: Planet mass (M_sun).
         time_in_Myr: Duration of tidal evolution (Myr).
-        step_factor: Maximum fractional change per step. Default: 0.01.
+        step_factor: Maximum fractional change per step. Default: 0.05.
 
     Returns:
         TidalEffectResult containing updated eccentricity and semi-major axis.
     """
-    n_cum = 0.0
-    while n_cum < 1.0 and e > 1e-3:
-        derivs = get_tidal_derivatives(e=e, a=a, m1=m1, m2=m2)
-        dedn = derivs.de_dt * time_in_Myr
-        dadn = derivs.da_dt * time_in_Myr
-        dn = get_tidal_step_size(
-            dedn=dedn, dadn=dadn, e=e, a=a, step_factor=step_factor, n_cum=n_cum
+    t_remaining = time_in_Myr
+
+    while t_remaining > 0.0 and e > _E_FLOOR:
+        k1 = get_tidal_derivatives(e=e, a=a, m1=m1, m2=m2)
+        dt = min(_adaptive_dt(k1.de_dt, k1.da_dt, e, a, step_factor), t_remaining)
+
+        k2 = get_tidal_derivatives(
+            e=e + 0.5 * k1.de_dt * dt,
+            a=a + 0.5 * k1.da_dt * dt,
+            m1=m1,
+            m2=m2,
         )
-        n_cum += dn
-        e += dedn * dn
-        a += dadn * dn
+
+        e += k2.de_dt * dt
+        a += k2.da_dt * dt
+        t_remaining -= dt
+
     return TidalEffectResult(e=e, a=a)
 
 
