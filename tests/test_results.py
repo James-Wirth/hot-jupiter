@@ -1,0 +1,35 @@
+import pandas as pd
+import pytest
+
+from hj.evolution import StopCode
+from hj.results import STOPCODE_COLORS, Results
+
+
+def test_stopcode_colors_complete():
+    for sc in StopCode:
+        assert sc in STOPCODE_COLORS
+        assert isinstance(STOPCODE_COLORS[sc], str)
+    assert STOPCODE_COLORS[StopCode.HJ] != STOPCODE_COLORS[StopCode.WJ]
+
+
+def test_compute_outcome_probabilities_normalization():
+    hj_rows = [{"r": 10.0, "stop_code": StopCode.HJ.value}] * 5
+    td_rows = [{"r": 10.0, "stop_code": StopCode.TD.value}] * 3
+    nm_rows = [{"r": 10.0, "stop_code": StopCode.NM.value}] * 2
+    df = pd.DataFrame(hj_rows + td_rows + nm_rows)
+    results = Results(df)
+    probs = results.compute_outcome_probabilities()
+    assert pytest.approx(probs["HJ"], rel=1e-3) == 0.5
+    assert pytest.approx(probs["TD"], rel=1e-3) == 0.3
+    assert pytest.approx(probs["NM"], rel=1e-3) == 0.2
+    for label in ["ION", "WJ"]:
+        assert pytest.approx(probs[label], abs=1e-6) == 0.0
+
+
+def test_filter_and_sample_frac_consistency():
+    hj_rows = [{"r": 1.0, "stop_code": StopCode.HJ.value}] * 10
+    nm_rows = [{"r": 1.0, "stop_code": StopCode.NM.value}] * 90
+    df = pd.DataFrame(hj_rows + nm_rows)
+    results = Results(df)
+    filtered = results.filter_outcomes(include=["HJ"], sample_frac={"NM": 0.5})
+    assert all(filtered["stop_code"].isin([StopCode.HJ.value, StopCode.NM.value]))
