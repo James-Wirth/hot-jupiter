@@ -1,0 +1,37 @@
+[project]
+name = "hot-jupiter"
+version = "0.1.0"
+description = "MC simulations of HJ Formation in dense stellar clusters"
+authors = [{ name = "James Wirth" }]
+requires-python = ">=3.8"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["hj"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes (unused imports, undefined names, etc.)
+    "I",      # isort (import sorting)
+    "UP",     # pyupgrade (modern Python syntax)
+    "B",      # flake8-bugbear (common bugs)
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["hj"]
+
+[tool.ruff.format]
+docstring-code-format = true
