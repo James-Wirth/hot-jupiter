@@ -392,8 +392,8 @@ def step(
     enc_v: np.ndarray,
     enc_b: np.ndarray,
     enc_lan: np.ndarray,
-    enc_aop: np.ndarray,
     enc_inc: np.ndarray,
+    enc_aop: np.ndarray,
     enc_m3: np.ndarray,
 ) -> None:
     """
@@ -463,8 +463,8 @@ def step(
             enc_v[i] = v_inf
             enc_b[i] = b
             enc_lan[i] = lan
-            enc_aop[i] = aop
             enc_inc[i] = inc
+            enc_aop[i] = aop
             enc_m3[i] = m3
 
 

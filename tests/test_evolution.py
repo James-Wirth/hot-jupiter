@@ -32,6 +32,21 @@ def test_run_simulation_terminates_all_systems():
     assert set(state.stop_code.tolist()).issubset({sc.value for sc in StopCode})
 
 
+def test_run_simulation_hybrid_mode_terminates():
+    cluster = Plummer()
+    state = sample_initial_conditions(16, cluster, np.random.default_rng(3))
+    run_simulation(
+        state,
+        cluster,
+        time_total=200.0,
+        rng=np.random.default_rng(4),
+        hybrid_switch=True,
+        n_jobs=1,
+    )
+    assert (state.stop_code != STOP_CODE_UNSET).all()
+    assert set(state.stop_code.tolist()).issubset({sc.value for sc in StopCode})
+
+
 def test_run_simulation_deterministic_under_same_seed():
     cluster = Plummer()
     seed = 7

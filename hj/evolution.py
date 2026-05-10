@@ -53,8 +53,8 @@ def _batch_nbody(
     enc_v: np.ndarray,
     enc_b: np.ndarray,
     enc_lan: np.ndarray,
-    enc_aop: np.ndarray,
     enc_inc: np.ndarray,
+    enc_aop: np.ndarray,
     enc_m3: np.ndarray,
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -105,8 +105,8 @@ def run_simulation(
     enc_v = np.empty(n, dtype=np.float64)
     enc_b = np.empty(n, dtype=np.float64)
     enc_lan = np.empty(n, dtype=np.float64)
-    enc_aop = np.empty(n, dtype=np.float64)
     enc_inc = np.empty(n, dtype=np.float64)
+    enc_aop = np.empty(n, dtype=np.float64)
     enc_m3 = np.empty(n, dtype=np.float64)
 
     with Parallel(n_jobs=n_jobs, backend="loky") as parallel:
@@ -152,8 +152,8 @@ def run_simulation(
                 enc_v,
                 enc_b,
                 enc_lan,
-                enc_aop,
                 enc_inc,
+                enc_aop,
                 enc_m3,
             )
 
@@ -167,8 +167,8 @@ def run_simulation(
                         enc_v,
                         enc_b,
                         enc_lan,
-                        enc_aop,
                         enc_inc,
+                        enc_aop,
                         enc_m3,
                         rng,
                     )
