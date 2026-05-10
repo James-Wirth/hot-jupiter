@@ -25,13 +25,9 @@ from hj.config import (
     XI,
     G,
 )
+from hj.state import STOP_UNSET, StopCode
 
 __all__ = [
-    "STOP_NM",
-    "STOP_ION",
-    "STOP_TD",
-    "STOP_HJ",
-    "STOP_WJ",
     "critical_radii",
     "step",
     "recheck_stop",
@@ -40,13 +36,6 @@ __all__ = [
     "_convert_mean_to_true_anomaly",
     "plummer_kernel_params",
 ]
-
-# Stop codes
-STOP_NM: int = 0
-STOP_ION: int = 1
-STOP_TD: int = 2
-STOP_HJ: int = 3
-STOP_WJ: int = 4
 
 # Numerical constants used by njit kernels
 _XI_CBRT: float = XI ** (1.0 / 3.0)
@@ -321,18 +310,18 @@ def _classify_stop(
     time_total: float,
 ) -> int:
     if e >= 1.0:
-        return STOP_ION
+        return StopCode.ION.value
     if a * (1.0 - e) < R_td:
-        return STOP_TD
+        return StopCode.TD.value
     cir = e <= CIRCULARISATION_THRESHOLD_ECCENTRICITY
     timeout = t >= time_total
     if a < R_hj and (cir or timeout):
-        return STOP_HJ
+        return StopCode.HJ.value
     if R_hj < a < R_wj and (cir or timeout):
-        return STOP_WJ
+        return StopCode.WJ.value
     if cir or timeout:
-        return STOP_NM
-    return -1
+        return StopCode.NM.value
+    return STOP_UNSET
 
 
 # ------------------------------ Plummer (Fast) -----------------------------
@@ -407,7 +396,7 @@ def step(
     """
     N = e_arr.shape[0]
     for i in prange(N):
-        if stop_code_arr[i] != -1:
+        if stop_code_arr[i] != STOP_UNSET:
             continue
 
         t = t_arr[i]
@@ -434,7 +423,7 @@ def step(
         a_arr[i] = a
 
         code = _classify_stop(e, a, new_t, R_td, R_hj, R_wj, time_total)
-        if code != -1:
+        if code != STOP_UNSET:
             stop_code_arr[i] = code
             stop_time_arr[i] = new_t
             continue
@@ -455,7 +444,7 @@ def step(
             e_new = e + de
             e_arr[i] = e_new
             code = _classify_stop(e_new, a, new_t, R_td, R_hj, R_wj, time_total)
-            if code != -1:
+            if code != STOP_UNSET:
                 stop_code_arr[i] = code
                 stop_time_arr[i] = new_t
         else:
@@ -494,7 +483,7 @@ def recheck_stop(
             R_wj_arr[i],
             time_total,
         )
-        if code != -1:
+        if code != STOP_UNSET:
             stop_code_arr[i] = code
             stop_time_arr[i] = t_arr[i]
 

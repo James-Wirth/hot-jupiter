@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import logging
 import math
-from enum import IntEnum
 
 import numpy as np
 from joblib import Parallel, delayed
 
 from hj import core, sampling
 from hj.clusters import Cluster, Plummer
-from hj.state import STOP_CODE_UNSET, State
+from hj.state import STOP_UNSET, State, StopCode
 
 __all__ = ["StopCode", "run_simulation", "sample_initial_conditions"]
 
@@ -17,14 +16,6 @@ logger = logging.getLogger(__name__)
 
 _NBODY_SERIAL_CUTOFF: int = 32
 _MAX_STEPS: int = 1_000_000
-
-
-class StopCode(IntEnum):
-    NM = core.STOP_NM
-    ION = core.STOP_ION
-    TD = core.STOP_TD
-    HJ = core.STOP_HJ
-    WJ = core.STOP_WJ
 
 
 def sample_initial_conditions(
@@ -111,7 +102,7 @@ def run_simulation(
 
     with Parallel(n_jobs=n_jobs, backend="loky") as parallel:
         for _step_idx in range(_MAX_STEPS):
-            if not (state.stop_code == STOP_CODE_UNSET).any():
+            if not (state.stop_code == STOP_UNSET).any():
                 break
 
             needs_nbody.fill(False)
@@ -187,12 +178,12 @@ def run_simulation(
                         time_total,
                     )
         else:
-            survivors = state.stop_code == STOP_CODE_UNSET
+            survivors = state.stop_code == STOP_UNSET
             if survivors.any():
                 logger.warning(
                     "Reached _MAX_STEPS=%d with %d active systems; forcing NM.",
                     _MAX_STEPS,
                     int(survivors.sum()),
                 )
-                state.stop_code[survivors] = core.STOP_NM
+                state.stop_code[survivors] = StopCode.NM
                 state.stop_time[survivors] = state.t[survivors]

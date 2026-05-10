@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import IntEnum
 
 import numpy as np
 
-__all__ = ["State", "STOP_CODE_UNSET"]
+__all__ = ["State", "StopCode", "STOP_UNSET"]
 
 
-STOP_CODE_UNSET: np.int8 = np.int8(-1)
+class StopCode(IntEnum):
+    NM = 0
+    ION = 1
+    TD = 2
+    HJ = 3
+    WJ = 4
+
+
+STOP_UNSET: int = -1
 
 
 @dataclass(slots=True)
@@ -34,7 +43,7 @@ class State:
             m2=np.empty(n, np.float64),
             lagrange=np.empty(n, np.float64),
             t=np.zeros(n, np.float64),
-            stop_code=np.full(n, STOP_CODE_UNSET, np.int8),
+            stop_code=np.full(n, STOP_UNSET, np.int8),
             stop_time=np.zeros(n, np.float64),
         )
 
@@ -42,7 +51,7 @@ class State:
         return self.e.shape[0]
 
     def active_mask(self) -> np.ndarray:
-        return self.stop_code == STOP_CODE_UNSET
+        return self.stop_code == STOP_UNSET
 
     def any_active(self) -> bool:
-        return bool((self.stop_code == STOP_CODE_UNSET).any())
+        return bool((self.stop_code == STOP_UNSET).any())

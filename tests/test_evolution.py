@@ -2,7 +2,7 @@ import numpy as np
 
 from hj.clusters import Plummer
 from hj.evolution import StopCode, run_simulation, sample_initial_conditions
-from hj.state import STOP_CODE_UNSET
+from hj.state import STOP_UNSET
 
 
 def test_sample_initial_conditions_reproducible():
@@ -14,7 +14,7 @@ def test_sample_initial_conditions_reproducible():
         np.testing.assert_array_equal(getattr(s1, col), getattr(s2, col))
     assert np.array_equal(s1.e, s1.e_init)
     assert np.array_equal(s1.a, s1.a_init)
-    assert (s1.stop_code == STOP_CODE_UNSET).all()
+    assert (s1.stop_code == STOP_UNSET).all()
 
 
 def test_run_simulation_terminates_all_systems():
@@ -28,7 +28,7 @@ def test_run_simulation_terminates_all_systems():
         hybrid_switch=False,
         n_jobs=1,
     )
-    assert (state.stop_code != STOP_CODE_UNSET).all()
+    assert (state.stop_code != STOP_UNSET).all()
     assert set(state.stop_code.tolist()).issubset({sc.value for sc in StopCode})
 
 
@@ -43,7 +43,7 @@ def test_run_simulation_hybrid_mode_terminates():
         hybrid_switch=True,
         n_jobs=1,
     )
-    assert (state.stop_code != STOP_CODE_UNSET).all()
+    assert (state.stop_code != STOP_UNSET).all()
     assert set(state.stop_code.tolist()).issubset({sc.value for sc in StopCode})
 
 

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from hj.evolution import StopCode
+from hj.state import StopCode
 
 __all__ = ["Results", "STOPCODE_COLORS"]
 
