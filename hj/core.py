@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import NamedTuple
 
 import numpy as np
 import rebound
@@ -28,6 +29,9 @@ from hj.config import (
 from hj.state import STOP_UNSET, StopCode
 
 __all__ = [
+    "CriticalRadii",
+    "EncounterVariates",
+    "EncounterParams",
     "critical_radii",
     "step",
     "recheck_stop",
@@ -36,6 +40,35 @@ __all__ = [
     "_convert_mean_to_true_anomaly",
     "plummer_kernel_params",
 ]
+
+
+class CriticalRadii(NamedTuple):
+    td: np.ndarray
+    hj: np.ndarray
+    wj: np.ndarray
+
+
+class EncounterVariates(NamedTuple):
+    u_wt: np.ndarray
+    u_b: np.ndarray
+    u_lan: np.ndarray
+    u_aop: np.ndarray
+    u_inc: np.ndarray
+    u_m3: np.ndarray
+    n_x: np.ndarray
+    n_y: np.ndarray
+    n_z: np.ndarray
+
+
+class EncounterParams(NamedTuple):
+    needs_nbody: np.ndarray
+    v: np.ndarray
+    b: np.ndarray
+    lan: np.ndarray
+    inc: np.ndarray
+    aop: np.ndarray
+    m3: np.ndarray
+
 
 # Numerical constants used by njit kernels
 _XI_CBRT: float = XI ** (1.0 / 3.0)
@@ -287,13 +320,11 @@ def _apply_tidal(
 # ----------------------------- Critical Radii ------------------------------
 
 
-def critical_radii(
-    m1: np.ndarray, m2: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def critical_radii(m1: np.ndarray, m2: np.ndarray) -> CriticalRadii:
     R_td = ETA * R_P * (m1 / m2) ** (1.0 / 3.0)
     R_hj = (MAX_HJ_PERIOD**2 * (m1 + m2)) ** (1.0 / 3.0)
     R_wj = (MAX_WJ_PERIOD**2 * (m1 + m2)) ** (1.0 / 3.0)
-    return R_td, R_hj, R_wj
+    return CriticalRadii(td=R_td, hj=R_hj, wj=R_wj)
 
 
 # --------------------------- Stopping Conditions ---------------------------
@@ -363,27 +394,11 @@ def step(
     stop_code_arr: np.ndarray,
     stop_time_arr: np.ndarray,
     plummer_static: np.ndarray,
-    R_td_arr: np.ndarray,
-    R_hj_arr: np.ndarray,
-    R_wj_arr: np.ndarray,
+    critical_radii: CriticalRadii,
     time_total: float,
     hybrid_switch: bool,
-    u_wt: np.ndarray,
-    u_b: np.ndarray,
-    u_lan: np.ndarray,
-    u_aop: np.ndarray,
-    u_inc: np.ndarray,
-    u_m3: np.ndarray,
-    n_x: np.ndarray,
-    n_y: np.ndarray,
-    n_z: np.ndarray,
-    needs_nbody: np.ndarray,
-    enc_v: np.ndarray,
-    enc_b: np.ndarray,
-    enc_lan: np.ndarray,
-    enc_inc: np.ndarray,
-    enc_aop: np.ndarray,
-    enc_m3: np.ndarray,
+    encounter_variates: EncounterVariates,
+    encounter_params: EncounterParams,
 ) -> None:
     """
     For each system...
@@ -394,6 +409,28 @@ def step(
       (5) If analytic valid (or hybrid_switch=False): commit delta_e, check stopping conditions.
       (6) Else: mark system as needing N-body, store encounter params for the worker.
     """
+    R_td_arr = critical_radii.td
+    R_hj_arr = critical_radii.hj
+    R_wj_arr = critical_radii.wj
+
+    u_wt = encounter_variates.u_wt
+    u_b = encounter_variates.u_b
+    u_lan = encounter_variates.u_lan
+    u_aop = encounter_variates.u_aop
+    u_inc = encounter_variates.u_inc
+    u_m3 = encounter_variates.u_m3
+    n_x = encounter_variates.n_x
+    n_y = encounter_variates.n_y
+    n_z = encounter_variates.n_z
+
+    needs_nbody = encounter_params.needs_nbody
+    enc_v = encounter_params.v
+    enc_b = encounter_params.b
+    enc_lan = encounter_params.lan
+    enc_inc = encounter_params.inc
+    enc_aop = encounter_params.aop
+    enc_m3 = encounter_params.m3
+
     N = e_arr.shape[0]
     for i in prange(N):
         if stop_code_arr[i] != STOP_UNSET:
@@ -465,12 +502,14 @@ def recheck_stop(
     t_arr: np.ndarray,
     stop_code_arr: np.ndarray,
     stop_time_arr: np.ndarray,
-    R_td_arr: np.ndarray,
-    R_hj_arr: np.ndarray,
-    R_wj_arr: np.ndarray,
+    critical_radii: CriticalRadii,
     time_total: float,
 ) -> None:
     """For systems whose state was updated by the N-body path."""
+    R_td_arr = critical_radii.td
+    R_hj_arr = critical_radii.hj
+    R_wj_arr = critical_radii.wj
+
     M = idx.shape[0]
     for k in prange(M):
         i = idx[k]

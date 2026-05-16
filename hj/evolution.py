@@ -32,6 +32,41 @@ def sample_initial_conditions(
     return state
 
 
+def _empty_encounter_params(n: int) -> core.EncounterParams:
+    return core.EncounterParams(
+        needs_nbody=np.zeros(n, dtype=np.bool_),
+        v=np.empty(n, dtype=np.float64),
+        b=np.empty(n, dtype=np.float64),
+        lan=np.empty(n, dtype=np.float64),
+        inc=np.empty(n, dtype=np.float64),
+        aop=np.empty(n, dtype=np.float64),
+        m3=np.empty(n, dtype=np.float64),
+    )
+
+
+def _sample_encounter_variates(
+    n: int, rng: np.random.Generator
+) -> core.EncounterVariates:
+    u_wt = rng.random(n)
+    u_b = rng.random(n)
+    u_lan = rng.random(n)
+    u_aop = rng.random(n)
+    u_inc = rng.random(n)
+    u_m3 = rng.random(n)
+    n_xyz = rng.standard_normal((3, n))
+    return core.EncounterVariates(
+        u_wt=u_wt,
+        u_b=u_b,
+        u_lan=u_lan,
+        u_aop=u_aop,
+        u_inc=u_inc,
+        u_m3=u_m3,
+        n_x=n_xyz[0],
+        n_y=n_xyz[1],
+        n_z=n_xyz[2],
+    )
+
+
 def _nbody_one(args: tuple[float, ...]) -> tuple[float, float]:
     v_inf, b, lan, inc, aop, e, a, m1, m2, m3, mean_anom = args
     return core.nbody_encounter_de(v_inf, b, lan, inc, aop, e, a, m1, m2, m3, mean_anom)
@@ -41,12 +76,7 @@ def _batch_nbody(
     parallel: Parallel,
     idx: np.ndarray,
     state: State,
-    enc_v: np.ndarray,
-    enc_b: np.ndarray,
-    enc_lan: np.ndarray,
-    enc_inc: np.ndarray,
-    enc_aop: np.ndarray,
-    enc_m3: np.ndarray,
+    encounter_params: core.EncounterParams,
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, np.ndarray]:
 
@@ -54,16 +84,16 @@ def _batch_nbody(
     mean_anoms = rng.uniform(-math.pi, math.pi, size=m)
     args_list = [
         (
-            float(enc_v[i]),
-            float(enc_b[i]),
-            float(enc_lan[i]),
-            float(enc_inc[i]),
-            float(enc_aop[i]),
+            float(encounter_params.v[i]),
+            float(encounter_params.b[i]),
+            float(encounter_params.lan[i]),
+            float(encounter_params.inc[i]),
+            float(encounter_params.aop[i]),
             float(state.e[i]),
             float(state.a[i]),
             float(state.m1[i]),
             float(state.m2[i]),
-            float(enc_m3[i]),
+            float(encounter_params.m3[i]),
             float(mean_anoms[k]),
         )
         for k, i in enumerate(idx)
@@ -89,93 +119,58 @@ def run_simulation(
 ) -> None:
 
     n = len(state)
-    R_td, R_hj, R_wj = core.critical_radii(state.m1, state.m2)
+    critical_radii = core.critical_radii(state.m1, state.m2)
     plummer_static = core.plummer_kernel_params(cluster)
 
-    needs_nbody = np.zeros(n, dtype=np.bool_)
-    enc_v = np.empty(n, dtype=np.float64)
-    enc_b = np.empty(n, dtype=np.float64)
-    enc_lan = np.empty(n, dtype=np.float64)
-    enc_inc = np.empty(n, dtype=np.float64)
-    enc_aop = np.empty(n, dtype=np.float64)
-    enc_m3 = np.empty(n, dtype=np.float64)
+    encounter_params = _empty_encounter_params(n)
 
     with Parallel(n_jobs=n_jobs, backend="loky") as parallel:
         for _step_idx in range(_MAX_STEPS):
             if not (state.stop_code == STOP_UNSET).any():
                 break
 
-            needs_nbody.fill(False)
+            encounter_params.needs_nbody.fill(False)
 
-            u_wt = rng.random(n)
-            u_b = rng.random(n)
-            u_lan = rng.random(n)
-            u_aop = rng.random(n)
-            u_inc = rng.random(n)
-            u_m3 = rng.random(n)
-            n_xyz = rng.standard_normal((3, n))
+            encounter_variates = _sample_encounter_variates(n, rng)
 
             core.step(
-                state.e,
-                state.a,
-                state.m1,
-                state.m2,
-                state.lagrange,
-                state.t,
-                state.stop_code,
-                state.stop_time,
-                plummer_static,
-                R_td,
-                R_hj,
-                R_wj,
-                time_total,
-                hybrid_switch,
-                u_wt,
-                u_b,
-                u_lan,
-                u_aop,
-                u_inc,
-                u_m3,
-                n_xyz[0],
-                n_xyz[1],
-                n_xyz[2],
-                needs_nbody,
-                enc_v,
-                enc_b,
-                enc_lan,
-                enc_inc,
-                enc_aop,
-                enc_m3,
+                e_arr=state.e,
+                a_arr=state.a,
+                m1_arr=state.m1,
+                m2_arr=state.m2,
+                lagrange_arr=state.lagrange,
+                t_arr=state.t,
+                stop_code_arr=state.stop_code,
+                stop_time_arr=state.stop_time,
+                plummer_static=plummer_static,
+                critical_radii=critical_radii,
+                time_total=time_total,
+                hybrid_switch=hybrid_switch,
+                encounter_variates=encounter_variates,
+                encounter_params=encounter_params,
             )
 
             if hybrid_switch:
-                idx = np.flatnonzero(needs_nbody)
+                idx = np.flatnonzero(encounter_params.needs_nbody)
                 if idx.size:
                     de, da = _batch_nbody(
-                        parallel,
-                        idx,
-                        state,
-                        enc_v,
-                        enc_b,
-                        enc_lan,
-                        enc_inc,
-                        enc_aop,
-                        enc_m3,
-                        rng,
+                        parallel=parallel,
+                        idx=idx,
+                        state=state,
+                        encounter_params=encounter_params,
+                        rng=rng,
                     )
                     state.e[idx] += de
                     state.a[idx] += da
                     core.recheck_stop(
-                        idx,
-                        state.e,
-                        state.a,
-                        state.t,
-                        state.stop_code,
-                        state.stop_time,
-                        R_td,
-                        R_hj,
-                        R_wj,
-                        time_total,
+                        idx=idx,
+                        e_arr=state.e,
+                        a_arr=state.a,
+                        t_arr=state.t,
+                        stop_code_arr=state.stop_code,
+                        stop_time_arr=state.stop_time,
+                        critical_radii=critical_radii,
+                        time_total=time_total,
                     )
         else:
             survivors = state.stop_code == STOP_UNSET
