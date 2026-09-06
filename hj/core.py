@@ -143,12 +143,13 @@ def _convert_mean_to_true_anomaly(mean_anom: float, e: float) -> float:
 
 @njit(cache=True, fastmath=True, inline="always")
 def _perturber_orbit(
-    v_infty: float, b: float, m1: float, m2: float
+    v_infty: float, b: float, m1: float, m2: float, m3: float
 ) -> tuple[float, float, float]:
     """Hyperbolic perturber orbit (a, e, r_p) from v_inf, b, m1, m2."""
     if v_infty <= 0.0 or not math.isfinite(v_infty):
         v_infty = 1.0e-12
-    a_pert = -G * (m1 + m2) / (v_infty * v_infty)
+    m_total = m1 + m2 + m3
+    a_pert = -G * m_total / (v_infty * v_infty)
     e_pert = math.sqrt(1.0 + (b / a_pert) ** 2)
     r_p = -a_pert * (e_pert - 1.0)
     return a_pert, e_pert, r_p
@@ -168,7 +169,7 @@ def _critical_true_anomaly(a_pert: float, e_pert: float, r_p: float) -> float:
 
 @njit(cache=True, fastmath=True, inline="always")
 def _integration_time(
-    a_pert: float, e_pert: float, r_p: float, m1: float, m2: float
+    a_pert: float, e_pert: float, r_p: float, m1: float, m2: float, m3: float
 ) -> float:
     theta_crit = _critical_true_anomaly(a_pert, e_pert, r_p)
     cos_theta = math.cos(theta_crit)
@@ -177,7 +178,7 @@ def _integration_time(
         acosh_arg = 1.0
     hyp_anom = math.acosh(acosh_arg)
     half_time = (e_pert * math.sinh(hyp_anom) - hyp_anom) * math.sqrt(
-        (-a_pert) ** 3 / (G * (m1 + m2))
+        (-a_pert) ** 3 / (G * (m1 + m2 + m3))
     )
     return 2.0 * half_time
 
@@ -199,13 +200,13 @@ def _analytic_encounter_de(
     m3: float,
 ) -> tuple[bool, float]:
     """delta_e from a single encounter (Heggie & Rasio 1996)."""
-    a_pert, e_pert, r_p = _perturber_orbit(v_infty, b, m1, m2)
+    a_pert, e_pert, r_p = _perturber_orbit(v_infty, b, m1, m2, m3)
 
     valid = True
     if r_p / a <= T_MIN:
         valid = False
     else:
-        t_int = _integration_time(a_pert, e_pert, r_p, m1, m2)
+        t_int = _integration_time(a_pert, e_pert, r_p, m1, m2, m3)
         t_per = math.sqrt(a**3 / (m1 + m2))
         if t_int / t_per <= S_MIN:
             valid = False
@@ -544,8 +545,8 @@ def nbody_encounter_de(
     mean_anom: float,
 ) -> tuple[float, float]:
     """REBOUND (IAS15) integration of one 3-body encounter."""
-    a_pert, e_pert, r_p = _perturber_orbit(v_infty, b, m1, m2)
-    t_int = _integration_time(a_pert, e_pert, r_p, m1, m2)
+    a_pert, e_pert, r_p = _perturber_orbit(v_infty, b, m1, m2, m3)
+    t_int = _integration_time(a_pert, e_pert, r_p, m1, m2, m3)
     f0 = -_critical_true_anomaly(a_pert, e_pert, r_p)
     f_phase = _convert_mean_to_true_anomaly(mean_anom, e)
 
