@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -9,8 +11,11 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from hj import config
 from hj.clusters import Cluster
 from hj.evolution import run_simulation, sample_initial_conditions
+from hj.numerics import NumericalSettings
+from hj.provenance import runtime_metadata
 from hj.results import Results
 
 __all__ = ["HJModel"]
@@ -40,6 +45,12 @@ class HJModel:
         frames = []
         for f in files:
             try:
+                metadata_path = f.with_name("metadata.json")
+                if metadata_path.exists():
+                    metadata = json.loads(metadata_path.read_text())
+                    if metadata.get("status") != "complete":
+                        logger.warning("Skipping incomplete run %s", f.parent)
+                        continue
                 df = pd.read_parquet(f, engine="pyarrow")
                 df["run_id"] = f.parent.name
                 frames.append(df)
@@ -88,12 +99,16 @@ class HJModel:
         cluster: Cluster,
         hybrid_switch: bool = True,
         seed: int | None = None,
+        *,
+        n_jobs: int = -1,
+        numerics: NumericalSettings | None = None,
     ) -> None:
 
-        if time < 0:
+        if not np.isfinite(time) or time < 0:
             raise ValueError("time must be >= 0")
         if num_systems <= 0:
             raise ValueError("num_systems must be >= 0")
+        numerics = NumericalSettings() if numerics is None else numerics
 
         run_dir = self._allocate_new_run_dir()
         self.path = str(run_dir / "results.parquet")
@@ -105,26 +120,72 @@ class HJModel:
             self.name,
         )
 
-        rng = np.random.default_rng(seed)
-        state = sample_initial_conditions(num_systems, cluster, rng)
-        run_simulation(state, cluster, float(time), rng, hybrid_switch=hybrid_switch)
+        seed_sequence = np.random.SeedSequence(seed)
+        streams = seed_sequence.spawn(3)
+        initial_rng, encounter_rng, phase_rng = [
+            np.random.default_rng(s) for s in streams
+        ]
+        metadata = {
+            **runtime_metadata(),
+            "time_myr": float(time),
+            "num_systems": num_systems,
+            "hybrid_switch": hybrid_switch,
+            "seed_entropy": seed_sequence.entropy,
+            "random_stream_scheme": "initial_encounter_phase_v1",
+            "random_stream_spawn_keys": [list(s.spawn_key) for s in streams],
+            "bit_generator": type(encounter_rng.bit_generator).__name__,
+            "cluster_type": type(cluster).__name__,
+            "cluster": vars(cluster),
+            "constants": {name: getattr(config, name) for name in config.__all__},
+            "integrator": "ias15",
+            "ias15_epsilon": numerics.ias15_epsilon,
+            "ias15_adaptive_mode": 2,
+            "ias15_min_dt": 0.0,
+            "tidal_step_fraction": numerics.tidal_step_fraction,
+            "numerics": asdict(numerics),
+            "n_jobs": n_jobs,
+            "status": "running",
+        }
+        metadata_path = run_dir / "metadata.json"
+        metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
+        try:
+            state = sample_initial_conditions(num_systems, cluster, initial_rng)
+            run_simulation(
+                state,
+                cluster,
+                float(time),
+                encounter_rng,
+                hybrid_switch=hybrid_switch,
+                n_jobs=n_jobs,
+                phase_rng=phase_rng,
+                numerics=numerics,
+            )
 
-        r = cluster.radius(state.lagrange, float(time))
+            r = cluster.radius(state.lagrange, float(time))
 
-        table = pa.Table.from_pydict(
-            {
-                "r": np.asarray(r, dtype=np.float64),
-                "e_init": state.e_init,
-                "a_init": state.a_init,
-                "m1": state.m1,
-                "m2": state.m2,
-                "lagrange": state.lagrange,
-                "e": state.e,
-                "a": state.a,
-                "stop_code": state.stop_code.astype(np.int32),
-                "stop_time": state.stop_time,
-            }
-        )
-        pq.write_table(table, self.path, compression="snappy")
+            table = pa.Table.from_pydict(
+                {
+                    "system_id": np.arange(num_systems, dtype=np.int64),
+                    "replicate_id": [str(seed_sequence.entropy)] * num_systems,
+                    "r": np.asarray(r, dtype=np.float64),
+                    "e_init": state.e_init,
+                    "a_init": state.a_init,
+                    "m1": state.m1,
+                    "m2": state.m2,
+                    "lagrange": state.lagrange,
+                    "e": state.e,
+                    "a": state.a,
+                    "stop_code": state.stop_code.astype(np.int32),
+                    "stop_time": state.stop_time,
+                }
+            )
+            pq.write_table(table, self.path, compression="snappy")
+            metadata["status"] = "complete"
+            metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
+        except Exception as exc:
+            metadata["status"] = "failed"
+            metadata["error"] = f"{type(exc).__name__}: {exc}"
+            metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
+            raise
 
         self.invalidate_cache()

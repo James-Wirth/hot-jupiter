@@ -1,6 +1,9 @@
+import json
+
+import numpy as np
 import pandas as pd
 
-from hj import HJModel, StopCode
+from hj import HJModel, Plummer, StopCode
 
 
 def test_caching_and_invalidation(tmp_path):
@@ -31,3 +34,19 @@ def test_allocate_new_run_dir_increments(tmp_path):
     next_dir = model._allocate_new_run_dir()
     assert next_dir.name == "run_002"
     assert next_dir.exists()
+
+
+def test_run_records_replayable_provenance_and_system_ids(tmp_path):
+    first = HJModel("first", tmp_path)
+    first.run(0.0, 8, Plummer(), hybrid_switch=False, seed=None, n_jobs=1)
+    metadata = json.loads((tmp_path / "first/run_000/metadata.json").read_text())
+    assert metadata["status"] == "complete"
+    assert metadata["packages"]["rebound"]
+    assert metadata["random_stream_scheme"] == "initial_encounter_phase_v1"
+    np.testing.assert_array_equal(first.df.system_id, np.arange(8))
+    assert first.df.replicate_id.nunique() == 1
+    second = HJModel("replay", tmp_path)
+    second.run(
+        0.0, 8, Plummer(), hybrid_switch=False, seed=metadata["seed_entropy"], n_jobs=1
+    )
+    pd.testing.assert_frame_equal(first.df, second.df)

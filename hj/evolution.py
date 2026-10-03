@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import math
 
 import numpy as np
@@ -8,11 +7,10 @@ from joblib import Parallel, delayed
 
 from hj import core, sampling
 from hj.clusters import Cluster, Plummer
+from hj.numerics import NumericalSettings
 from hj.state import STOP_UNSET, State, StopCode
 
 __all__ = ["StopCode", "run_simulation", "sample_initial_conditions"]
-
-logger = logging.getLogger(__name__)
 
 _NBODY_SERIAL_CUTOFF: int = 32
 _MAX_STEPS: int = 1_000_000
@@ -67,9 +65,15 @@ def _sample_encounter_variates(
     )
 
 
-def _nbody_one(args: tuple[float, ...]) -> tuple[float, float]:
-    v_inf, b, lan, inc, aop, e, a, m1, m2, m3, mean_anom = args
-    return core.nbody_encounter_de(v_inf, b, lan, inc, aop, e, a, m1, m2, m3, mean_anom)
+def _nbody_one(
+    args: tuple[float, ...], numerics: NumericalSettings
+) -> tuple[float, float]:
+    return core.nbody_encounter_de(
+        *args,
+        xi=numerics.encounter_xi,
+        epsilon=numerics.ias15_epsilon,
+        phase_at_pericentre=numerics.phase_at_pericentre,
+    )
 
 
 def _batch_nbody(
@@ -77,11 +81,12 @@ def _batch_nbody(
     idx: np.ndarray,
     state: State,
     encounter_params: core.EncounterParams,
-    rng: np.random.Generator,
+    mean_anoms: np.ndarray,
+    numerics: NumericalSettings | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
 
     m = idx.size
-    mean_anoms = rng.uniform(-math.pi, math.pi, size=m)
+    numerics = NumericalSettings() if numerics is None else numerics
     args_list = [
         (
             float(encounter_params.v[i]),
@@ -94,15 +99,15 @@ def _batch_nbody(
             float(state.m1[i]),
             float(state.m2[i]),
             float(encounter_params.m3[i]),
-            float(mean_anoms[k]),
+            float(mean_anoms[i]),
         )
-        for k, i in enumerate(idx)
+        for i in idx
     ]
 
     if m < _NBODY_SERIAL_CUTOFF:
-        results = [_nbody_one(args) for args in args_list]
+        results = [_nbody_one(args, numerics) for args in args_list]
     else:
-        results = parallel(delayed(_nbody_one)(args) for args in args_list)
+        results = parallel(delayed(_nbody_one)(args, numerics) for args in args_list)
 
     de = np.fromiter((r[0] for r in results), dtype=np.float64, count=m)
     da = np.fromiter((r[1] for r in results), dtype=np.float64, count=m)
@@ -116,13 +121,19 @@ def run_simulation(
     rng: np.random.Generator,
     hybrid_switch: bool = True,
     n_jobs: int = -1,
+    *,
+    phase_rng: np.random.Generator | None = None,
+    numerics: NumericalSettings | None = None,
 ) -> None:
 
     n = len(state)
+    numerics = NumericalSettings() if numerics is None else numerics
     critical_radii = core.critical_radii(state.m1, state.m2)
     plummer_static = core.plummer_kernel_params(cluster)
 
     encounter_params = _empty_encounter_params(n)
+    if phase_rng is None:
+        phase_rng = np.random.default_rng(rng.integers(0, 2**63))
 
     with Parallel(n_jobs=n_jobs, backend="loky") as parallel:
         for _step_idx in range(_MAX_STEPS):
@@ -132,6 +143,7 @@ def run_simulation(
             encounter_params.needs_nbody.fill(False)
 
             encounter_variates = _sample_encounter_variates(n, rng)
+            mean_anoms = phase_rng.uniform(-math.pi, math.pi, size=n)
 
             core.step(
                 e_arr=state.e,
@@ -148,6 +160,10 @@ def run_simulation(
                 hybrid_switch=hybrid_switch,
                 encounter_variates=encounter_variates,
                 encounter_params=encounter_params,
+                tidal_step_fraction=numerics.tidal_step_fraction,
+                b_max=numerics.b_max,
+                tidal_threshold=numerics.tidal_threshold,
+                slow_threshold=numerics.slow_threshold,
             )
 
             if hybrid_switch:
@@ -158,7 +174,8 @@ def run_simulation(
                         idx=idx,
                         state=state,
                         encounter_params=encounter_params,
-                        rng=rng,
+                        mean_anoms=mean_anoms,
+                        numerics=numerics,
                     )
                     state.e[idx] += de
                     state.a[idx] += da
@@ -175,10 +192,6 @@ def run_simulation(
         else:
             survivors = state.stop_code == STOP_UNSET
             if survivors.any():
-                logger.warning(
-                    "Reached _MAX_STEPS=%d with %d active systems; forcing NM.",
-                    _MAX_STEPS,
-                    int(survivors.sum()),
+                raise RuntimeError(
+                    f"Reached {_MAX_STEPS} steps with {int(survivors.sum())} active systems"
                 )
-                state.stop_code[survivors] = StopCode.NM
-                state.stop_time[survivors] = state.t[survivors]

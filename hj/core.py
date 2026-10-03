@@ -71,7 +71,6 @@ class EncounterParams(NamedTuple):
 
 
 # Numerical constants used by njit kernels
-_XI_CBRT: float = XI ** (1.0 / 3.0)
 _TWO_PI: float = 2.0 * math.pi
 _SQRT_2: float = math.sqrt(2.0)
 _E_FLOOR: float = 1.0e-3
@@ -79,7 +78,6 @@ _EPS15: float = 1.0e-15
 _EPS14: float = 1.0e-14
 _EPS16: float = 1.0e-16
 _ADJUSTED_GAMMA: float = 3.21
-_BMAX_FRAC_SQ: float = (B_MAX / 75.0) ** 2
 
 # Inverse-CDF coefficients for the perturber-mass IMF (47 Tuc, Giersz & Heggie 2011)
 _M3_A: float = 1.8 / (4.0 * M_BR**0.6 - 3.0 * M_MIN**0.6 - M_BR**2.4 * M_MAX**-1.8)
@@ -100,32 +98,31 @@ def _wrap_angle(x: float) -> float:
     return x - math.pi
 
 
-@njit(cache=True, fastmath=True)
+@njit(cache=True)
 def _solve_kepler(mean_anom: float, e: float) -> float:
-    mean_anom = _wrap_angle(mean_anom)
-    sign = 1.0 if math.sin(mean_anom) >= 0.0 else -1.0
-    ecc_anom = mean_anom + sign * 0.85 * e
-    for _ in range(3):
-        cos_ecc = math.cos(ecc_anom)
-        sin_ecc = math.sin(ecc_anom)
-        residual = ecc_anom - e * sin_ecc - mean_anom
-        deriv1 = 1.0 - e * cos_ecc
-        if abs(deriv1) < _EPS15:
-            ecc_anom -= residual
-            continue
-        ratio = residual / deriv1
-        denom = (
-            deriv1
-            - 0.5 * (e * sin_ecc) * ratio
-            + (1.0 / 6.0) * (e * cos_ecc) * ratio * ratio
-        )
-        if abs(denom) > _EPS15:
-            ecc_anom -= residual / denom
+    if not -math.pi <= mean_anom <= math.pi:
+        mean_anom = _wrap_angle(mean_anom)
+    if mean_anom == 0.0 or e == 0.0:
+        return mean_anom
+    sign = 1.0 if mean_anom > 0.0 else -1.0
+    target = abs(mean_anom)
+    lower = 0.0
+    upper = math.pi
+    ecc_anom = min(target + 0.85 * e, upper)
+    for _ in range(64):
+        residual = ecc_anom - e * math.sin(ecc_anom) - target
+        if residual > 0.0:
+            upper = ecc_anom
         else:
-            ecc_anom -= ratio
-        if abs(residual) < _EPS14:
-            break
-    return ecc_anom
+            lower = ecc_anom
+        derivative = 1.0 - e * math.cos(ecc_anom)
+        candidate = ecc_anom - residual / derivative
+        if not lower <= candidate <= upper:
+            candidate = 0.5 * (lower + upper)
+        if abs(candidate - ecc_anom) <= 2.0e-15 * max(1.0, abs(ecc_anom)):
+            return sign * candidate
+        ecc_anom = candidate
+    raise RuntimeError("Kepler solver did not converge")
 
 
 @njit(cache=True, fastmath=True)
@@ -156,9 +153,11 @@ def _perturber_orbit(
 
 
 @njit(cache=True, fastmath=True, inline="always")
-def _critical_true_anomaly(a_pert: float, e_pert: float, r_p: float) -> float:
+def _critical_true_anomaly(
+    a_pert: float, e_pert: float, r_p: float, xi: float = XI
+) -> float:
     """True anomaly at r_crit = r_p / XI^(1/3)."""
-    r_crit = r_p / _XI_CBRT
+    r_crit = r_p / xi ** (1.0 / 3.0)
     cos_theta = (1.0 / e_pert) * (((a_pert * (1.0 - e_pert * e_pert)) / r_crit) - 1.0)
     if cos_theta > 1.0:
         cos_theta = 1.0
@@ -169,9 +168,15 @@ def _critical_true_anomaly(a_pert: float, e_pert: float, r_p: float) -> float:
 
 @njit(cache=True, fastmath=True, inline="always")
 def _integration_time(
-    a_pert: float, e_pert: float, r_p: float, m1: float, m2: float, m3: float
+    a_pert: float,
+    e_pert: float,
+    r_p: float,
+    m1: float,
+    m2: float,
+    m3: float,
+    xi: float = XI,
 ) -> float:
-    theta_crit = _critical_true_anomaly(a_pert, e_pert, r_p)
+    theta_crit = _critical_true_anomaly(a_pert, e_pert, r_p, xi)
     cos_theta = math.cos(theta_crit)
     acosh_arg = (e_pert + cos_theta) / (1.0 + e_pert * cos_theta)
     if acosh_arg < 1.0:
@@ -198,17 +203,19 @@ def _analytic_encounter_de(
     m1: float,
     m2: float,
     m3: float,
+    tidal_threshold: float = T_MIN,
+    slow_threshold: float = S_MIN,
 ) -> tuple[bool, float]:
     """delta_e from a single encounter (Heggie & Rasio 1996)."""
     a_pert, e_pert, r_p = _perturber_orbit(v_infty, b, m1, m2, m3)
 
     valid = True
-    if r_p / a <= T_MIN:
+    if r_p / a <= tidal_threshold:
         valid = False
     else:
         t_int = _integration_time(a_pert, e_pert, r_p, m1, m2, m3)
         t_per = math.sqrt(a**3 / (m1 + m2))
-        if t_int / t_per <= S_MIN:
+        if t_int / t_per <= slow_threshold:
             valid = False
 
     m_total = m1 + m2 + m3
@@ -295,10 +302,14 @@ def _tidal_derivs(e: float, a: float, m1: float, m2: float) -> tuple[float, floa
 
 @njit(cache=True, fastmath=True)
 def _apply_tidal(
-    e: float, a: float, m1: float, m2: float, dt_total: float
+    e: float,
+    a: float,
+    m1: float,
+    m2: float,
+    dt_total: float,
+    step_factor: float = 0.05,
 ) -> tuple[float, float]:
     """Adaptive RK2 tidal evolution."""
-    step_factor = 0.05
     t_remaining = dt_total
     while t_remaining > 0.0 and e > _E_FLOOR:
         de1, da1 = _tidal_derivs(e, a, m1, m2)
@@ -400,6 +411,10 @@ def step(
     hybrid_switch: bool,
     encounter_variates: EncounterVariates,
     encounter_params: EncounterParams,
+    tidal_step_fraction: float = 0.05,
+    b_max: float = B_MAX,
+    tidal_threshold: float = T_MIN,
+    slow_threshold: float = S_MIN,
 ) -> None:
     """
     For each system...
@@ -449,13 +464,13 @@ def step(
 
         _, n_tot, sigma_v = _plummer_radius_and_env(plummer_static, lagrange, t)
 
-        rate = _ADJUSTED_GAMMA * n_tot * _BMAX_FRAC_SQ * (sigma_v * _SQRT_2)
+        rate = _ADJUSTED_GAMMA * n_tot * (b_max / 75.0) ** 2 * (sigma_v * _SQRT_2)
         wt = -math.log(u_wt[i]) / rate
         new_t = t + wt
         if new_t > time_total:
             new_t = time_total
 
-        e, a = _apply_tidal(e, a, m1, m2, wt)
+        e, a = _apply_tidal(e, a, m1, m2, new_t - t, tidal_step_fraction)
         t_arr[i] = new_t
         e_arr[i] = e
         a_arr[i] = a
@@ -470,13 +485,26 @@ def step(
         v_inf = (
             math.sqrt(n_x[i] * n_x[i] + n_y[i] * n_y[i] + n_z[i] * n_z[i]) * sigma_rel
         )
-        b = B_MAX * math.sqrt(u_b[i])
+        b = b_max * math.sqrt(u_b[i])
         lan = u_lan[i] * _TWO_PI
         aop = u_aop[i] * _TWO_PI
         inc = math.acos(1.0 - 2.0 * u_inc[i])
         m3 = _sample_m3(u_m3[i])
 
-        valid, de = _analytic_encounter_de(v_inf, b, lan, inc, aop, e, a, m1, m2, m3)
+        valid, de = _analytic_encounter_de(
+            v_inf,
+            b,
+            lan,
+            inc,
+            aop,
+            e,
+            a,
+            m1,
+            m2,
+            m3,
+            tidal_threshold,
+            slow_threshold,
+        )
 
         if valid or not hybrid_switch:
             e_new = e + de
@@ -543,23 +571,70 @@ def nbody_encounter_de(
     m2: float,
     m3: float,
     mean_anom: float,
+    *,
+    xi: float = XI,
+    epsilon: float = 1e-9,
+    phase_at_pericentre: bool = False,
 ) -> tuple[float, float]:
     """REBOUND (IAS15) integration of one 3-body encounter."""
+    sim, t_int = _create_encounter_simulation(
+        v_infty,
+        b,
+        lan,
+        inc,
+        aop,
+        e,
+        a,
+        m1,
+        m2,
+        m3,
+        mean_anom,
+        xi=xi,
+        epsilon=epsilon,
+        phase_at_pericentre=phase_at_pericentre,
+    )
+    sim.integrate(t_int)
+    o = sim.particles[1].orbit(primary=sim.particles[0])
+    return o.e - e, o.a - a
+
+
+def _create_encounter_simulation(
+    v_infty: float,
+    b: float,
+    lan: float,
+    inc: float,
+    aop: float,
+    e: float,
+    a: float,
+    m1: float,
+    m2: float,
+    m3: float,
+    mean_anom: float,
+    *,
+    xi: float = XI,
+    epsilon: float = 1e-9,
+    phase_at_pericentre: bool = False,
+) -> tuple[rebound.Simulation, float]:
+    if not 0.0 < xi < 1.0 or not math.isfinite(epsilon) or epsilon <= 0.0:
+        raise ValueError("Require 0 < xi < 1 and finite epsilon > 0")
     a_pert, e_pert, r_p = _perturber_orbit(v_infty, b, m1, m2, m3)
-    t_int = _integration_time(a_pert, e_pert, r_p, m1, m2, m3)
-    f0 = -_critical_true_anomaly(a_pert, e_pert, r_p)
+    t_int = _integration_time(a_pert, e_pert, r_p, m1, m2, m3, xi)
+    f0 = -_critical_true_anomaly(a_pert, e_pert, r_p, xi)
+    if phase_at_pericentre:
+        mean_anom -= math.sqrt(G * (m1 + m2) / a**3) * t_int / 2.0
     f_phase = _convert_mean_to_true_anomaly(mean_anom, e)
 
     sim = rebound.Simulation()
     sim.G = G
+    sim.integrator = "ias15"
+    sim.ri_ias15.epsilon = epsilon
+    sim.ri_ias15.min_dt = 0.0
+    sim.ri_ias15.adaptive_mode = 2
     sim.add(m=m1)
     sim.add(m=m2, a=a, e=e, f=f_phase)
     sim.add(m=m3, a=a_pert, e=e_pert, f=f0, Omega=lan, inc=inc, omega=aop)
     sim.move_to_com()
-    sim.integrate(t_int)
-
-    o = sim.particles[1].orbit()
-    return o.e - e, o.a - a
+    return sim, t_int
 
 
 def plummer_kernel_params(plummer) -> np.ndarray:

@@ -1,9 +1,40 @@
 import numpy as np
+import pytest
 
 from hj import core, evolution
 from hj.clusters import Plummer
 from hj.evolution import StopCode, run_simulation, sample_initial_conditions
 from hj.state import STOP_UNSET
+
+
+@pytest.mark.parametrize("remaining_time", [0.0, 0.01])
+def test_tidal_evolution_stops_at_simulation_horizon(remaining_time):
+    cluster = Plummer()
+    state = sample_initial_conditions(1, cluster, np.random.default_rng(1))
+    state.e[:] = 0.98
+    state.a[:] = 1.0
+    state.m1[:] = 0.5
+    state.m2[:] = 0.001
+    state.lagrange[:] = 0.99
+    state.t[:] = 12000.0 - remaining_time
+
+    run_simulation(
+        state,
+        cluster,
+        time_total=12000.0,
+        rng=np.random.default_rng(2),
+        hybrid_switch=False,
+        n_jobs=1,
+    )
+
+    assert state.t[0] == 12000.0
+    assert state.stop_time[0] == 12000.0
+    assert state.stop_code[0] == StopCode.NM
+    assert 0.97999 < state.e[0] <= 0.98
+    assert 0.9999 < state.a[0] <= 1.0
+    if remaining_time == 0.0:
+        assert state.e[0] == 0.98
+        assert state.a[0] == 1.0
 
 
 def test_sample_initial_conditions_reproducible():
@@ -119,3 +150,50 @@ def test_run_simulation_deterministic_under_same_seed():
 
     for col in ("e", "a", "stop_code", "stop_time", "t"):
         np.testing.assert_array_equal(getattr(s_a, col), getattr(s_b, col))
+
+
+def test_encounter_random_stream_is_independent_of_hybrid_branch(monkeypatch):
+    original = evolution._sample_encounter_variates
+    recorded = []
+
+    def record(n, rng):
+        variates = original(n, rng)
+        recorded.append(np.concatenate(variates).copy())
+        return variates
+
+    monkeypatch.setattr(evolution, "_sample_encounter_variates", record)
+    samples = []
+    for hybrid in (False, True):
+        recorded.clear()
+        cluster = Plummer()
+        state = sample_initial_conditions(16, cluster, np.random.default_rng(3))
+        run_simulation(
+            state,
+            cluster,
+            200.0,
+            np.random.default_rng(4),
+            hybrid_switch=hybrid,
+            n_jobs=1,
+            phase_rng=np.random.default_rng(5),
+        )
+        samples.append(list(recorded))
+    assert min(map(len, samples)) >= 2
+    for left, right in zip(*samples):
+        np.testing.assert_array_equal(left, right)
+
+
+def test_planetary_phase_is_indexed_by_system(monkeypatch):
+    captured = []
+
+    def record(*args, **kwargs):
+        captured.append(args[-1])
+        return 0.0, 0.0
+
+    monkeypatch.setattr(core, "nbody_encounter_de", record)
+    state = sample_initial_conditions(4, Plummer(), np.random.default_rng(1))
+    params = evolution._empty_encounter_params(4)
+    for values in params[1:]:
+        values.fill(1.0)
+    phases = np.array([0.1, 0.2, 0.3, 0.4])
+    evolution._batch_nbody(None, np.array([1, 3]), state, params, phases)
+    assert captured == [0.2, 0.4]
