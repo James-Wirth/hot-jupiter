@@ -3,9 +3,9 @@
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 ![CI](https://github.com/James-Wirth/hot-jupiter/actions/workflows/ci.yml/badge.svg)
 
-> This repository accompanies the paper:  
-> **"Hot Jupiter formation in dense stellar clusters: A Monte Carlo model applied to 47 Tucanae"**  
-> James A. Wirth, Cathie J. Clarke, Andrew J. Winter. *Monthly Notices of the Royal Astronomical Society, 2025.*<br>
+> This repository accompanies the paper:<br />
+> **"Hot Jupiter formation in dense stellar clusters: A Monte Carlo model applied to 47 Tucanae"**<br />
+> James A. Wirth, Cathie J. Clarke, Andrew J. Winter. *Monthly Notices of the Royal Astronomical Society, 2025.*<br />
 > [DOI](https://doi.org/10.1093/mnras/staf1325) | [arXiv](https://arxiv.org/abs/2508.08406)
 
 **hot-jupiter** is a Monte Carlo simulation package for studying Hot Jupiter formation in dense globular clusters via high-eccentricity migration. We use the [REBOUND](https://github.com/hannorein/rebound) code with the IAS15 numerical integrator to follow planetary systems perturbed by stellar encounters over Gyr timescales. The paper applies this model to 47 Tucanae, asking how efficiently stellar encounters can turn cold Jupiter progenitors into Hot Jupiters and whether the resulting occurrence rate is consistent with transit-survey non-detections.
@@ -14,13 +14,13 @@ The eccentricity of a planetary system can be perturbed by stellar flybys. At hi
 
 Applied to cold Jupiter progenitors at initial separations of 1–30 au over 12 Gyr, the hybrid model in the [paper](https://arxiv.org/html/2508.08406v1#S4) gives an HJ occurrence rate of approximately $5.9 \times 10^{-4}$ per cluster star, assuming a 10% initial cold Jupiter occurrence rate. This is a 51% enhancement relative to the analytic Monte Carlo baseline, while remaining consistent with the observational upper limits discussed in the paper. HJ formation is concentrated towards the cluster core and falls steeply beyond a few parsecs.
 
-<br>
+<br />
 <p align="center">
-  <img src="https://github.com/user-attachments/files/21801314/show_paths_mnras.pdf" alt="Simulation Results" width="80%" />
-  <br />
-  <em>Example: The phase-space paths for a sample of Hot Jupiter (HJ), Warm Jupiter (WJ), Tidal Disruption (TD) and No-Migration (NM) outcomes. </em>
+  <img src="https://github.com/user-attachments/files/21801314/show_paths_mnras.pdf" alt="Simulation Results" width="80%" /><br />
+  <sub><em>Example: The phase-space paths for a sample of Hot Jupiter (HJ), Warm Jupiter (WJ),<br />
+  Tidal Disruption (TD) and No-Migration (NM) outcomes.</em></sub>
 </p>
-<br>
+<br />
 
 The final states of planetary systems are categorised into five unique outcomes: Ionisation (ION), Tidal Disruption (TD), Hot Jupiter formation (HJ), Warm Jupiter formation (WJ) and No Migration (NM).
 
