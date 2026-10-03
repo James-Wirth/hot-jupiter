@@ -9,7 +9,9 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from hj.diagnostics import outcome_diagnostics
 from hj.state import StopCode
+from hj.statistics import outcome_intervals, replicate_intervals
 
 __all__ = ["Results", "STOPCODE_COLORS"]
 
@@ -242,6 +244,31 @@ class Results:
     ) -> list[float]:
         mask = self.df["stop_code"].isin(_codes(outcomes)) & (self.df["r"] <= r_max)
         return self.df.loc[mask, feature].tolist()
+
+    def compute_outcome_intervals(
+        self,
+        confidence: float = 0.95,
+        method: str = "wilson",
+        r_range: tuple[float, float] | None = None,
+        r_max: float = 100.0,
+    ) -> pd.DataFrame:
+        selected = self.filter_outcomes(r_range=r_range or (0.0, r_max))
+        return outcome_intervals(selected["stop_code"], confidence, method)
+
+    def compute_replicate_intervals(
+        self,
+        confidence: float = 0.95,
+        replicate_column: str = "replicate_id",
+    ) -> pd.DataFrame:
+        return replicate_intervals(self.df, confidence, replicate_column)
+
+    def compute_outcome_diagnostics(
+        self,
+        r_range: tuple[float, float] | None = None,
+        r_max: float = 100.0,
+    ) -> pd.DataFrame:
+        selected = self.filter_outcomes(r_range=r_range or (0.0, r_max))
+        return outcome_diagnostics(selected)
 
     def project_radius(self, random_seed: int | None = None) -> None:
         rng = np.random.default_rng(random_seed)
